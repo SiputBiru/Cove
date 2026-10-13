@@ -19,6 +19,7 @@ fn resize_island(window: tauri::WebviewWindow, width: f64, height: f64) -> Resul
   center_top(&window).map_err(|e| e.to_string())
 }
 
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
