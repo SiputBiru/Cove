@@ -1,5 +1,5 @@
 [package]
-name = "app"
+name = "Cove"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -16,6 +16,12 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7.2", features = [] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging"
+] }
 
 [dependencies]
 serde_json = "1.0"
