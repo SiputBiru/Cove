@@ -2,7 +2,7 @@
 
 Cove is a "Dynamic Island" style app for desktop. It puts a small pill at the top-center of your screen that expands into a panel when clicked. Similar to the Dynamic Island on those iPhones.
 
-It's built with [Tauri](https://tauri.app/) (Rust backend) and [Svelte](https://svelte.dev/) (frontend), using TypeScript and Vite.
+It's built with [Tauri](https://tauri.app/) (Rust backend) and [Svelte](https://svelte.dev/) (frontend), using TypeScript, Vite, and [Tailwind CSS](https://tailwindcss.com/) with the [Vite plugin](https://tailwindcss.com/docs/installation/using-vite).
 
 ## What it does
 
@@ -22,11 +22,16 @@ The backend (`src-tauri/src/lib.rs`):
 
 Window options (transparent, always on top, no decorations, skip taskbar) are configured in `src-tauri/tauri.conf.json`.
 
+## Styling
+
+Styling is done with [Tailwind CSS](https://tailwindcss.com/) v4 (via `@tailwindcss/vite`). Global styles and the Tailwind import live in `src/app.css`; component markup in `src/App.svelte` uses utility classes. A small amount of custom CSS is kept for things utilities can't express cleanly the pill's inverse-radius notch ears (pseudo-elements with `radial-gradient`) and the state transitions.
+
 ## Project structure
 
 ```
 src/                  Svelte frontend
-  App.svelte          The island UI and animation
+  App.svelte          The island UI and animations
+  app.css             Tailwind import and global styles
   main.ts             App entry point
 src-tauri/            Rust / Tauri backend
   src/lib.rs          Window setup and resize command
