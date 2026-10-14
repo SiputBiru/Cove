@@ -55,10 +55,18 @@
             class="content relative w-full h-full flex items-center justify-center font-sans"
         >
             <div
-                class="compact-view absolute text-[13px] font-semibold tabular-nums"
-                class:hidden={open}
+                class="compact-view w-full px-5 flex justify-between items-center absolute text-[13px] font-semibold tabular-nums"
+                class:is-hidden={open}
             >
-                <span class="clock">{timeString}</span>
+                <div class="flex justify-center items-center ml-0.5">
+                    <div
+                        class="absolute bg-red-600 size-3 rounded-full animate-ping"
+                    ></div>
+                    <div
+                        class="absolute bg-red-600 size-2.5 rounded-full"
+                    ></div>
+                </div>
+                <div class="clock">{timeString}</div>
             </div>
 
             <div
@@ -134,14 +142,15 @@
     }
 
     .compact-view {
+        transform: scale(1);
         transition:
             opacity 0.3s ease 0s,
             transform 0.3s ease 0s;
     }
 
-    .compact-view.hidden {
+    .compact-view.is-hidden {
         opacity: 0;
-        transform: scale(0.85);
+        transform: scale(0.5);
         pointer-events: none;
     }
 
