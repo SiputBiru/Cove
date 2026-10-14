@@ -1,4 +1,5 @@
 <script lang="ts">
+    import "./app.css";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
 
@@ -17,7 +18,6 @@
         hour: "2-digit",
         minute: "2-digit",
     });
-
     $: dateString = time.toLocaleDateString([], {
         weekday: "short",
         month: "short",
@@ -28,7 +28,7 @@
 
     async function toggle() {
         if (!open) {
-            await invoke("resize_island", { width: 400, height: 120 });
+            await invoke("resize_island", { width: 310, height: 120 });
             await nextFrame();
             await nextFrame();
             open = true;
@@ -39,48 +39,61 @@
 
     function onEnd(e: TransitionEvent) {
         if (!open && e.propertyName === "height") {
-            invoke("resize_island", { width: 260, height: 80 });
+            invoke("resize_island", { width: 310, height: 32 });
         }
     }
 </script>
 
-<main>
+<main class="flex justify-center">
     <button
-        class="island"
+        class="island relative border-0 bg-black text-white cursor-pointer p-0 will-change-[width,height,border-radius] transform:translateZ(0)"
         class:open
         on:click={toggle}
+        on:transitionend={onEnd}
     >
-        <div class="content">
-            <div class="compact-view" class:hidden={open}>
+        <div
+            class="content relative w-full h-full flex items-center justify-center font-sans"
+        >
+            <div
+                class="compact-view absolute text-[13px] font-semibold tabular-nums"
+                class:hidden={open}
+            >
                 <span class="clock">{timeString}</span>
             </div>
 
-            <div class="expanded-view" class:visible={open}>
-                <span class="large-time">{timeString}</span>
-                <span class="date">{dateString}</span>
+            <div
+                class="expanded-view flex flex-row items-center gap-0.5 overflow-x-scroll snap-x snap-mandatory hiddenScrollBar"
+                class:visible={open}
+            >
+                <div class="flex flex-col w-full flex-[1_0_auto]">
+                    <span class="large-time text-2xl font-bold tabular-nums"
+                        >{timeString}</span
+                    >
+                    <span
+                        class="date text-[11px] text-[#8e8e93] uppercase tracking-[0.8px]"
+                        >{dateString}</span
+                    >
+                </div>
+                <div class="flex flex-col w-full flex-[1_0_auto]">
+                    <span class="large-time text-2xl font-bold tabular-nums"
+                        >Todo Tasks</span
+                    >
+                    <span
+                        class="date text-[11px] text-[#8e8e93] uppercase tracking-[0.8px]"
+                        >Example</span
+                    >
+                </div>
             </div>
         </div>
     </button>
 </main>
 
 <style>
-    main {
-        display: flex;
-        justify-content: center;
-    }
     .island {
         --ear: 14px;
-        position: relative;
         width: 180px;
         height: 32px;
-        border: 0;
         border-radius: 0 0 18px 18px;
-        background: #000;
-        color: #fff;
-        cursor: pointer;
-        padding: 0;
-        will-change: width, height, border-radius;
-        transform: translateZ(0);
         transition:
             height 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
             width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s,
@@ -120,24 +133,7 @@
             border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
     }
 
-    /* Content Layout & Smooth Transitions */
-    .content {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: system-ui, -apple-system, sans-serif;
-    }
-
     .compact-view {
-        position: absolute;
-        font-size: 13px;
-        font-weight: 600;
-        font-variant-numeric: tabular-nums;
-        opacity: 1;
-        transform: scale(1);
         transition:
             opacity 0.3s ease 0s,
             transform 0.3s ease 0s;
@@ -150,11 +146,7 @@
     }
 
     .expanded-view {
-        position: absolute;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 2px;
+        -webkit-overflow-scrolling: touch;
         opacity: 0;
         transform: scale(0.9);
         pointer-events: none;
@@ -172,16 +164,12 @@
             transform 0.25s ease 0.35s;
     }
 
-    .large-time {
-        font-size: 24px;
-        font-weight: 700;
-        font-variant-numeric: tabular-nums;
+    .hiddenScrollBar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
     }
 
-    .date {
-        font-size: 11px;
-        color: #8e8e93;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
+    .hiddenScrollBar:global(::-webkit-scrollbar) {
+        display: none;
     }
 </style>
