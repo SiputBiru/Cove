@@ -1,66 +1,47 @@
+import gsap from 'gsap';
+
 type MagneticOptions = {
-  strength?: number;
-  max?: number;
-  ease?: number;
+	strength?: number;
+	max?: number;
+	duration?: number;
+	ease?: string;
 };
 
 export function magnetic(
-  node: HTMLElement,
-  { strength = 0.1, max = 12, ease = 0.15 }: MagneticOptions = {},
+	node: HTMLElement,
+	{ strength = 0.075, max = 12, duration = 0.4, ease = 'power2.out' }: MagneticOptions = {}
 ) {
-  const zone = node.parentElement;
-  if (!zone) return {};
+	const zone = node.parentElement;
+	if (!zone) return {};
 
-  let x = 0;
-  let y = 0;
-  let targetX = 0;
-  let targetY = 0;
-  let raf = 0;
+	const xTo = gsap.quickTo(node, 'x', { duration, ease });
+	const yTo = gsap.quickTo(node, 'y', { duration, ease });
 
-  const tick = () => {
-    x += (targetX - x) * ease;
-    y += (targetY - y) * ease;
-    node.style.translate = `${x}px ${y}px`;
+	const onMove = (e: PointerEvent) => {
+		const rect = zone.getBoundingClientRect();
+		const dx = e.clientX - (rect.left + rect.width / 2);
+		const dy = e.clientY - (rect.top + rect.height / 2);
 
-    const settled =
-      Math.abs(targetX - x) < 0.05 && Math.abs(targetY - y) < 0.05;
-    if (settled) {
-      x = targetX;
-      y = targetY;
-      node.style.translate = `${x}px ${y}px`;
-      raf = 0;
-      return;
-    }
-    raf = requestAnimationFrame(tick);
-  };
+		const targetX = Math.max(-max, Math.min(max, dx * strength));
+		const targetY = Math.max(-max, Math.min(max, dy * strength));
 
-  const run = () => {
-    if (!raf) raf = requestAnimationFrame(tick);
-  };
+		xTo(targetX);
+		yTo(targetY);
+	};
 
-  const onMove = (e: PointerEvent) => {
-    const rect = zone.getBoundingClientRect();
-    const dx = e.clientX - (rect.left + rect.width / 2);
-    const dy = e.clientY - (rect.top + rect.height / 2);
-    targetX = Math.max(-max, Math.min(max, dx * strength));
-    targetY = Math.max(-max, Math.min(max, dy * strength));
-    run();
-  };
+	const onLeave = () => {
+		xTo(0);
+		yTo(0);
+	};
 
-  const onLeave = () => {
-    targetX = 0;
-    targetY = 0;
-    run();
-  };
+	zone.addEventListener('pointermove', onMove);
+	zone.addEventListener('pointerleave', onLeave);
 
-  zone.addEventListener("pointermove", onMove);
-  zone.addEventListener("pointerleave", onLeave);
-
-  return {
-    destroy() {
-      zone.removeEventListener("pointermove", onMove);
-      zone.removeEventListener("pointerleave", onLeave);
-      cancelAnimationFrame(raf);
-    },
-  };
+	return {
+		destroy() {
+			zone.removeEventListener('pointermove', onMove);
+			zone.removeEventListener('pointerleave', onLeave);
+			gsap.killTweensOf(node);
+		}
+	};
 }
