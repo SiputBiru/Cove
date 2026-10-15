@@ -2,6 +2,7 @@
     import "./app.css";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
+    import { magnetic } from "./lib/magnetic";
     import "@fontsource-variable/inter/wght.css";
 
     const SIZE = {
@@ -124,6 +125,7 @@
                         <div class="panel-box">
                             <div
                                 class="flex flex-col items-center"
+                                use:magnetic
                             >
                                 <span class="title">{timeString}</span>
                                 <span class="subtitle">{dateString}</span>
