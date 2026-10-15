@@ -2,19 +2,24 @@
     import "./app.css";
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
+    import "@fontsource-variable/inter/wght.css";
 
-    const COMPACT = { width: 460, height: 32 };
-    const OPEN = { width: 460, height: 160 };
+    const SIZE = {
+        compact: { width: 480, height: 32 },
+        open: { width: 480, height: 160 },
+    };
+    const TABS = ["Clock", "Todo", "Pomodoro"];
 
     let open = false;
+    let activeTab = 0;
     let time = new Date();
 
-    onMount(() => {
-        const interval = setInterval(() => {
-            time = new Date();
-        }, 1000);
+    const COOLDOWN_MS = 750;
+    let locked = false;
 
-        return () => clearInterval(interval);
+    onMount(() => {
+        const timer = setInterval(() => (time = new Date()), 1000);
+        return () => clearInterval(timer);
     });
 
     $: timeString = time.toLocaleTimeString([], {
@@ -30,169 +35,117 @@
     const nextFrame = () => new Promise(requestAnimationFrame);
 
     async function toggle() {
-        if (!open) {
-            await invoke("resize_island", OPEN);
+        if (locked) return;
+        locked = true;
+
+        try {
+            if (open) {
+                open = false;
+                return;
+            }
+            await invoke("resize_island", SIZE.open);
             await nextFrame();
             await nextFrame();
             open = true;
-        } else {
-            open = false;
+        } finally {
+            setTimeout(() => (locked = false), COOLDOWN_MS);
         }
     }
 
-    function onIslandTransitionEnd(e: TransitionEvent) {
-        if (e.propertyName !== "width" || open) return;
-        invoke("resize_island", COMPACT);
+    function buttonLike(e: KeyboardEvent) {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle();
+        }
+    }
+
+    function onTransitionEnd(e: TransitionEvent) {
+        if (e.target !== e.currentTarget) return;
+        if (e.propertyName === "width" && !open) {
+            invoke("resize_island", SIZE.compact);
+        }
     }
 </script>
 
 <main class="flex justify-center">
-    <button
-        class="island relative border-0 bg-black text-white cursor-pointer p-0 will-change-[width,height,border-radius] transform:translateZ(0)"
+    <div
+        role="button"
+        tabindex="0"
+        class="island relative bg-black text-white cursor-pointer will-change-[width,height,border-radius] transform-gpu"
         class:open
         on:click={toggle}
-        on:transitionend={onIslandTransitionEnd}
+        on:keydown={buttonLike}
+        on:transitionend={onTransitionEnd}
     >
         <div
-            class="content relative w-full h-full flex items-center justify-center font-sans"
+            class="relative w-full h-full flex flex-col items-center font-sans overflow-hidden"
         >
+            <!-- Compact view -->
             <div
-                class="compact-view w-full px-5 flex justify-between absolute text-[13px] font-semibold tabular-nums"
+                class="compact-view absolute top-2 z-20 w-full px-5 flex justify-between items-center text-[13px] font-semibold tabular-nums"
                 class:is-hidden={open}
             >
                 <div class="flex justify-center items-center ml-0.5">
                     <div
-                        class="absolute flex size-2.5 bg-blue-100 rounded-full"
+                        class="absolute size-2.5 bg-blue-100 rounded-full"
                     ></div>
                     <div
-                        class="absolute flex size-3 bg-blue-100 rounded-full animate-ping"
+                        class="absolute size-3 bg-blue-100 rounded-full animate-ping"
                     ></div>
                 </div>
-                <div class="clock">{timeString}</div>
+                <span>{timeString}</span>
             </div>
 
+            <!-- Tab nav -->
+            <div class="top-nav reveal" class:shown={open}>
+                {#each TABS as tab, index}
+                    <button
+                        type="button"
+                        class="nav-pill"
+                        class:active={activeTab === index}
+                        on:click|stopPropagation={() => (activeTab = index)}
+                    >
+                        {tab}
+                    </button>
+                {/each}
+            </div>
+
+            <!-- Sliding panels -->
             <div
-                class="expanded-view w-full flex flex-row items-center gap-0.5 overflow-x-auto snap-x snap-mandatory"
-                class:visible={open}
+                class="reveal relative w-full flex-1 overflow-hidden"
+                class:shown={open}
             >
-                <div class="expand-child">
-                    <span class="large-time text-2xl font-bold tabular-nums"
-                        >{timeString}</span
-                    >
-                    <span
-                        class="date text-[11px] text-[#8e8e93] uppercase tracking-[0.8px]"
-                        >{dateString}</span
-                    >
-                </div>
-                <div class="expand-child">
-                    <span class="large-time text-2xl font-bold tabular-nums"
-                        >Todo Tasks</span
-                    >
-                    <span
-                        class="date text-[11px] text-[#8e8e93] uppercase tracking-[0.8px]"
-                        >Example</span
-                    >
-                </div>
-                <div class="expand-child">
-                    <span class="large-time text-2xl font-bold tabular-nums"
-                        >Pomodoro</span
-                    >
-                    <span
-                        class="bg-blue-200 rounded-full w-fit py-0.75 px-5 mt-1.5 mx-auto text-black ring-5 ring-blue-200/40 font-semibold"
-                        >Start</span
-                    >
+                <div
+                    class="slider-track"
+                    style="transform: translateX(-{activeTab * 100}%);"
+                >
+                    <div class="panel">
+                        <div class="panel-box">
+                            <div
+                                class="flex flex-col items-center"
+                            >
+                                <span class="title">{timeString}</span>
+                                <span class="subtitle">{dateString}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-box">
+                            <span class="title">Todo Tasks</span>
+                            <span class="subtitle">Example</span>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-box">
+                            <span class="title">Pomodoro</span>
+                            <span class="start-pill">Start</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </button>
+    </div>
 </main>
-
-<style>
-    .island {
-        --ear: 14px;
-        width: 180px;
-        height: 32px;
-        border-radius: 0 0 18px 18px;
-        transition:
-            height 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
-            width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s,
-            border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
-    }
-    .island::before,
-    .island::after {
-        content: "";
-        position: absolute;
-        top: 0;
-        width: var(--ear);
-        height: var(--ear);
-    }
-    .island::before {
-        left: calc(var(--ear) * -1);
-        background: radial-gradient(
-            circle at 0 100%,
-            transparent calc(var(--ear) - 0.5px),
-            #000 var(--ear)
-        );
-    }
-    .island::after {
-        right: calc(var(--ear) * -1);
-        background: radial-gradient(
-            circle at 100% 100%,
-            transparent calc(var(--ear) - 0.5px),
-            #000 var(--ear)
-        );
-    }
-    .island.open {
-        width: 440px;
-        height: 160px;
-        border-radius: 0 0 28px 28px;
-        transition:
-            width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
-            height 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s,
-            border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
-    }
-
-    .compact-view {
-        transform: scale(1);
-        transition:
-            opacity 0.3s ease 0s,
-            transform 0.3s ease 0s;
-    }
-
-    .compact-view.is-hidden {
-        opacity: 0;
-        transform: scale(0.5);
-        pointer-events: none;
-    }
-
-    .expanded-view {
-        scroll-snap-type: x mandatory;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-        opacity: 0;
-        transform: scale(0.9);
-        pointer-events: none;
-        transition:
-            opacity 0.3s ease 0s,
-            transform 0.3s ease 0s;
-    }
-
-    .expanded-view::-webkit-scrollbar {
-        display: none;
-    }
-
-    .expanded-view.visible {
-        opacity: 1;
-        transform: scale(1);
-        pointer-events: auto;
-        transition:
-            opacity 0.25s ease 0.35s,
-            transform 0.25s ease 0.35s;
-    }
-
-    .expand-child {
-        @apply flex flex-col w-full flex-[1_0_auto];
-        padding: 12px 0;
-        scroll-snap-align: start;
-    }
-</style>

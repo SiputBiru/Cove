@@ -1,12 +1,138 @@
 @import "tailwindcss";
 
+@theme {
+    --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
 html,
 body,
 #app {
+    user-select: none;
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
     background: transparent;
+}
+
+/* ---------- Island shell ---------- */
+.island {
+    --ear: 14px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    width: 180px;
+    height: 32px;
+    border-radius: 0 0 18px 18px;
+    transition:
+        height 0.3s var(--ease) 0s,
+        width 0.3s var(--ease) 0.38s,
+        border-radius 0.3s var(--ease) 0.38s;
+}
+
+.island.open {
+    width: 440px;
+    height: 160px;
+    border-radius: 0 0 28px 28px;
+    transition:
+        width 0.3s var(--ease) 0s,
+        height 0.3s var(--ease) 0.3s,
+        border-radius 0.3s var(--ease) 0.3s;
+}
+
+.island::before,
+.island::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: var(--ear);
+    height: var(--ear);
+    background: radial-gradient(
+        circle at var(--at),
+        transparent calc(var(--ear) - 0.5px),
+        #000 var(--ear)
+    );
+}
+.island::before {
+    left: calc(var(--ear) * -1);
+    --at: 0 100%;
+}
+.island::after {
+    right: calc(var(--ear) * -1);
+    --at: 100% 100%;
+}
+
+/* ---------- Compact view ---------- */
+.compact-view {
+    transition:
+        opacity 0.2s ease 0.38s,
+        transform 0.2s ease 0.38s;
+}
+.compact-view.is-hidden {
+    opacity: 0;
+    transform: scale(0.5);
+    pointer-events: none;
+    transition:
+        opacity 0.15s ease 0s,
+        transform 0.15s ease 0s;
+}
+
+/* ---------- Reveal: hidden instantly, fades in after the island grows ---------- */
+.reveal {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: scale(var(--from-scale, 0.95));
+    transition: none;
+}
+.reveal.shown {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: scale(1);
+    transition:
+        opacity 0.25s ease 0.3s,
+        transform 0.25s ease 0.3s,
+        visibility 0s linear 0s;
+}
+
+/* ---------- Tabs ---------- */
+.top-nav {
+    @apply flex items-center justify-center gap-1.5 pt-2.5 z-10;
+    --from-scale: 0.8;
+}
+.nav-pill {
+    @apply text-white/60 text-[11px] font-semibold px-3 pt-0.5 cursor-pointer transition-all duration-200;
+}
+.nav-pill:hover {
+    @apply text-white scale-110;
+}
+.nav-pill.active {
+    @apply text-white font-bold scale-110;
+}
+
+/* ---------- Panels ---------- */
+.slider-track {
+    @apply flex w-full h-full transition-transform duration-300 ease-out will-change-transform;
+}
+.panel {
+    @apply flex flex-none w-full h-full p-3 pt-2;
+}
+.panel-box {
+    @apply flex flex-col items-center w-full h-full overflow-y-auto bg-white/10 rounded-[18px] px-4 py-2;
+    justify-content: safe center;
+    scrollbar-width: none;
+}
+.panel-box::-webkit-scrollbar {
+    display: none;
+}
+
+/* ---------- Text ---------- */
+.title {
+    @apply text-4xl font-bold tabular-nums;
+}
+.subtitle {
+    @apply text-base text-[#8e8e93] uppercase tracking-[0.8px];
+}
+.start-pill {
+    @apply bg-blue-200 rounded-full py-0.75 px-5 mt-1.5 text-black ring-5 ring-blue-200/40 font-semibold;
 }
