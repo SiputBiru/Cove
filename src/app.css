@@ -11,6 +11,7 @@
 
 @theme {
     --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+    --color-accent: #a8e6dc;
 }
 
 html,
@@ -89,28 +90,6 @@ body,
         transform 0.15s ease 0s;
 }
 
-/* ---------- Day progress line ---------- */
-.day-line {
-    position: absolute;
-    left: 18px;
-    right: 18px;
-    bottom: 2px;
-    z-index: 20;
-    height: 2px;
-    border-radius: 9999px;
-    background: rgb(255 255 255 / 0.1);
-    overflow: hidden;
-}
-.day-line::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    transform-origin: left;
-    transform: scaleX(var(--p));
-    background: rgb(191 219 254 / 0.7);
-    transition: transform 1s var(--ease-linear);
-}
-
 /* ---------- Reveal: hidden instantly, fades in after the island grows ---------- */
 .reveal {
     opacity: 0;
@@ -147,7 +126,7 @@ body,
 
 /* ---------- Panels ---------- */
 .slider-track {
-    transition: transform 0.4s var(--ease);
+    transition: transform 0.45s var(--ease);
     @apply flex w-full h-full will-change-transform;
 }
 .panel {
@@ -173,5 +152,5 @@ body,
     @apply text-base text-[#8e8e93] uppercase tracking-[0.8px];
 }
 .start-pill {
-    @apply bg-blue-200 rounded-full py-0.75 px-5 mt-1.5 text-black ring-5 ring-blue-200/40 font-semibold;
+    @apply bg-accent rounded-full py-0.75 px-5 mt-1.5 text-black ring-5 ring-accent/40 font-semibold;
 }

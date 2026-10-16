@@ -116,10 +116,10 @@
             >
                 <div class="flex justify-center items-center ml-0.5">
                     <div
-                        class="absolute size-2.5 bg-blue-100 rounded-full"
+                        class="absolute size-2.5 bg-accent rounded-full"
                     ></div>
                     <div
-                        class="absolute size-3 bg-blue-100 rounded-full animate-ping"
+                        class="absolute size-3 bg-accent rounded-full animate-ping"
                     ></div>
                 </div>
                 <span>{timeString}</span>
