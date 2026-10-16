@@ -6,8 +6,6 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "dialog:default",
-    "fs:allow-read-dir"
+    "core:default"
   ]
 }
