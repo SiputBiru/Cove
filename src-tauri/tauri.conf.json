@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "Cove",
-        "width": 460,
+        "width": 480,
         "height": 32,
         "decorations": false,
         "transparent": true,

@@ -28,8 +28,10 @@ body,
 /* ---------- Island shell ---------- */
 .island {
     --ear: 14px;
+    --island-bg: #000;
     --ease: cubic-bezier(0.34, 1.3, 0.64, 1);
     --ease-linear: cubic-bezier(0.34, 1, 0.64, 1);
+    background: var(--island-bg);
     width: 180px;
     height: 32px;
     border-radius: 0 0 18px 18px;
@@ -56,19 +58,20 @@ body,
     top: 0;
     width: var(--ear);
     height: var(--ear);
-    background: radial-gradient(
-        circle at var(--at),
+    background: var(--island-bg);
+    mask: radial-gradient(
+        circle at var(--x) 100%,
         transparent calc(var(--ear) - 0.5px),
         #000 var(--ear)
     );
 }
 .island::before {
     left: calc(var(--ear) * -1);
-    --at: 0 100%;
+    --x: 0;
 }
 .island::after {
     right: calc(var(--ear) * -1);
-    --at: 100% 100%;
+    --x: 100%;
 }
 
 /* ---------- Compact view ---------- */
@@ -84,6 +87,28 @@ body,
     transition:
         opacity 0.15s ease 0s,
         transform 0.15s ease 0s;
+}
+
+/* ---------- Day progress line ---------- */
+.day-line {
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    bottom: 2px;
+    z-index: 20;
+    height: 2px;
+    border-radius: 9999px;
+    background: rgb(255 255 255 / 0.1);
+    overflow: hidden;
+}
+.day-line::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform-origin: left;
+    transform: scaleX(var(--p));
+    background: rgb(191 219 254 / 0.7);
+    transition: transform 1s var(--ease-linear);
 }
 
 /* ---------- Reveal: hidden instantly, fades in after the island grows ---------- */
@@ -126,7 +151,10 @@ body,
     @apply flex w-full h-full will-change-transform;
 }
 .panel {
-    @apply flex flex-none w-full h-full p-3 pt-2;
+    @apply flex flex-none w-full h-full p-2.5 pt-1.5;
+}
+.panel-viewport {
+    clip-path: inset(6px 10px 10px 10px round 18px);
 }
 .panel-box {
     @apply flex flex-col items-center w-full h-full overflow-y-auto bg-white/10 rounded-[18px] px-4 py-2;

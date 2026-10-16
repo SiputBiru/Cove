@@ -8,7 +8,7 @@
 
     const SIZE = {
         compact: { width: 480, height: 32 },
-        open: { width: 480, height: 170 },
+        open: { width: 480, height: 175 },
     };
     const TABS = ["Clock", "Todo", "Pomodoro"];
 
@@ -100,7 +100,7 @@
     <div
         role="button"
         tabindex="0"
-        class="island relative bg-black text-white cursor-pointer will-change-[width,height,border-radius] transform-gpu"
+        class="island relative text-white cursor-pointer will-change-[width,height,border-radius] transform-gpu"
         class:open
         on:click={toggle}
         on:keydown={buttonLike}
@@ -143,7 +143,7 @@
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-                class="reveal relative w-full flex-1 overflow-hidden"
+                class="reveal panel-viewport relative w-full flex-1 overflow-hidden"
                 class:shown={open}
                 on:click|stopPropagation={() => {}}
             >
