@@ -1,13 +1,14 @@
 <script lang="ts">
     import "./app.css";
-    import { invoke } from "@tauri-apps/api/core";
-    import { onMount } from "svelte";
     import { magnetic } from "./lib/magnetic";
-    import "@fontsource-variable/inter/wght.css";
+
+    import { invoke } from "@tauri-apps/api/core";
+
+    import { onMount } from "svelte";
 
     const SIZE = {
         compact: { width: 480, height: 32 },
-        open: { width: 480, height: 160 },
+        open: { width: 480, height: 170 },
     };
     const TABS = ["Clock", "Todo", "Pomodoro"];
 
@@ -18,9 +19,35 @@
     const COOLDOWN_MS = 750;
     let locked = false;
 
+    let clockTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function scheduleClock() {
+        time = new Date();
+        clockTimer = setTimeout(
+            scheduleClock,
+            60_000 - (time.getTime() % 60_000) + 50,
+        );
+    }
+
     onMount(() => {
-        const timer = setInterval(() => (time = new Date()), 1000);
-        return () => clearInterval(timer);
+        scheduleClock();
+
+        const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+
+        const onVisibility = () => {
+            clearTimeout(clockTimer);
+            if (!document.hidden) scheduleClock();
+        };
+
+        if (window.location.hostname === "tauri.localhost") {
+            window.addEventListener("contextmenu", handleContextMenu);
+        }
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            clearTimeout(clockTimer);
+            document.removeEventListener("visibilitychange", onVisibility);
+            window.removeEventListener("contextmenu", handleContextMenu);
+        };
     });
 
     $: timeString = time.toLocaleTimeString([], {
@@ -99,7 +126,7 @@
             </div>
 
             <!-- Tab nav -->
-            <div class="top-nav reveal" class:shown={open}>
+            <div class="reveal top-nav" class:shown={open}>
                 {#each TABS as tab, index}
                     <button
                         type="button"
@@ -113,9 +140,12 @@
             </div>
 
             <!-- Sliding panels -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
                 class="reveal relative w-full flex-1 overflow-hidden"
                 class:shown={open}
+                on:click|stopPropagation={() => {}}
             >
                 <div
                     class="slider-track"
