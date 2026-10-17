@@ -1,10 +1,10 @@
 [package]
 name = "Cove"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Time, held. A calm Dynamic Island-style overlay for your desktop."
+authors = ["Nobbel"]
+license = "MIT"
+repository = "https://github.com/nobberu/Cove"
 edition = "2024"
 rust-version = "1.90"
 
@@ -16,6 +16,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.7.2", features = [] }
+
+[profile.dev]
+debug = "line-tables-only"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = [
