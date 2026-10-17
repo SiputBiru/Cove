@@ -2,6 +2,8 @@
   <img src="assets/banner.jpg" alt="Cove" width="500">
 </h1>
 
+<h1 align="center">Cove</h1>
+
 <p align="center"><b>Time, held.</b></p>
 
 A small island at the top of your screen for the things that matter about time: what time it is, what needs it, and how you're spending it. Hover for a quick glance, click to open, click again, get back to your work.
