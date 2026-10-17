@@ -36,20 +36,18 @@ body,
     width: 180px;
     height: 32px;
     border-radius: 0 0 18px 18px;
-    transition:
-        height 0.3s var(--ease-linear) 0s,
-        width 0.4s var(--ease) 0.38s,
-        border-radius 0.4s var(--ease) 0.38s;
+    transition-property: height, width, border-radius;
+    transition-duration: 0.4s;
+    transition-timing-function: var(--ease);
 }
 
 .island.open {
     width: 450px;
     height: 170px;
     border-radius: 0 0 28px 28px;
-    transition:
-        width 0.3s var(--ease) 0s,
-        height 0.3s var(--ease) 0.3s,
-        border-radius 0.3s var(--ease) 0.3s;
+    transition-property: height, width, border-radius;
+    transition-duration: 0.35s;
+    transition-timing-function: var(--ease);
 }
 
 .island::before,
@@ -78,8 +76,8 @@ body,
 /* ---------- Compact view ---------- */
 .compact-view {
     transition:
-        opacity 0.2s ease 0.45s,
-        transform 0.2s ease 0.45s;
+        opacity 0.2s ease 0.15s,
+        transform 0.2s ease 0.15s;
 }
 .compact-view.is-hidden {
     opacity: 0;
@@ -104,8 +102,8 @@ body,
     pointer-events: auto;
     transform: scale(1);
     transition:
-        opacity 0.25s ease 0.3s,
-        transform 0.25s ease 0.3s,
+        opacity 0.25s ease 0.1s,
+        transform 0.25s ease 0.1s,
         visibility 0s linear 0s;
 }
 

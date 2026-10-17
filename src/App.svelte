@@ -16,13 +16,12 @@
     let activeTab = 0;
     let time = new Date();
 
-    const COOLDOWN_MS = 750;
+    const COOLDOWN_MS = 400;
     let locked = false;
 
     let clockTimer: ReturnType<typeof setTimeout> | undefined;
 
     let lowMemory = false;
-    let ready = false;
 
     async function setIdle(idle: boolean) {
         if (idle === lowMemory) return;
@@ -43,7 +42,7 @@
     }
 
     onMount(() => {
-        ready = true;
+        setIdle(true);
         scheduleClock();
 
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -73,8 +72,6 @@
         month: "short",
         day: "numeric",
     });
-
-    $: if (ready) setIdle(!open);
 
     const nextFrame = () => new Promise(requestAnimationFrame);
 
@@ -108,7 +105,7 @@
     function onTransitionEnd(e: TransitionEvent) {
         if (e.target !== e.currentTarget) return;
         if (e.propertyName === "width" && !open) {
-            invoke("resize_island", SIZE.compact);
+            invoke("resize_island", SIZE.compact).then(() => setIdle(true));
         }
     }
 </script>

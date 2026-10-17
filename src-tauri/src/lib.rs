@@ -1,6 +1,10 @@
 use std::thread;
 use std::time::Duration;
-use tauri::Manager;
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+    Manager,
+};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
@@ -102,6 +106,20 @@ pub fn run() {
 
             let window = app.get_webview_window("main").unwrap();
             center_top(&window)?;
+
+            let quit = MenuItem::with_id(app, "quit", "Quit Cove", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&quit])?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Cove")
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    if event.id.as_ref() == "quit" {
+                        app.exit(0);
+                    }
+                })
+                .build(app)?;
 
             #[cfg(target_os = "windows")]
             {
