@@ -1,66 +1,71 @@
-# Cove
+<h1 align="center">
+  <img src="assets/banner.jpg" alt="Cove" width="500">
+</h1>
 
-Cove is a "Dynamic Island" style app for desktop. It puts a small pill at the top-center of your screen that expands into a panel when clicked. Similar to the Dynamic Island on those iPhones.
+<p align="center"><b>Time, held.</b></p>
 
-It's built with [Tauri](https://tauri.app/) (Rust backend) and [Svelte](https://svelte.dev/) (frontend), using TypeScript, Vite, and [Tailwind CSS](https://tailwindcss.com/) with the [Vite plugin](https://tailwindcss.com/docs/installation/using-vite).
+A small island at the top of your screen for the things that matter about time: what time it is, what needs it, and how you're spending it. Hover for a quick glance, click to open, click again, get back to your work.
 
-## What it does
+Not a Swiss Army knife. Cove does less, on purpose.
 
-- Shows a frameless, transparent, always-on-top window docked to the top-center of the screen.
-- The window stays out of the taskbar and has no title bar, so it floats cleanly over the desktop.
-- Clicking the island animates it open into a larger panel. Clicking again collapses it back.
-- The Rust side resizes and re-centers the window on every toggle so the animation stays anchored to the top.
+## Why Cove
 
-## How it works
+Most notch apps keep adding widgets until they become another dashboard. Cove stays minimal, small, and sheltered.
 
-The frontend (`src/App.svelte`) renders the island and handles the expand/collapse animation. When the size changes it calls the `resize_island` Tauri command.
+- **Quiet by default.** It floats above your desktop, stays out of the taskbar, and never steals focus.
+- **Glanceable.** Collapsed, it shows just the time. Hover for the date and how many tasks are left, and open it only when you need more.
+- **Light and fast.** Built with Tauri and Svelte, and WebView2 usage has been optimized to use less RAM.
+- **Smooth.** Opening is spring-animated and anchored to the top of the screen like a real notch.
+- **Private.** Your tasks are saved locally on your machine.
 
-The backend (`src-tauri/src/lib.rs`):
+## What's inside
 
-- On startup, creates the window and centers it at the top of the primary monitor (`center_top`).
-- Exposes the `resize_island(width, height)` command, which resizes the window and re-centers it horizontally.
+- **Clock:** the time and date, always one glance away.
+- **Todo:** add tasks, check them off, and see how many are left. _(in progress)_
+- **Pomodoro:** focus in sessions. _(in progress)_
 
-Window options (transparent, always on top, no decorations, skip taskbar) are configured in `src-tauri/tauri.conf.json`.
+## Coming soon
 
-## Styling
+- Global hotkey that drops a task straight into Todo
+- Animation when a pomodoro session ends
+- Shelf: drop in a file and Cove holds it
 
-Styling is done with [Tailwind CSS](https://tailwindcss.com/) v4 (via `@tailwindcss/vite`). Global styles and the Tailwind import live in `src/app.css`; component markup in `src/App.svelte` uses utility classes. A small amount of custom CSS is kept for things utilities can't express cleanly the pill's inverse-radius notch ears (pseudo-elements with `radial-gradient`) and the state transitions.
+## What Cove won't do
 
-## Project structure
+No weather. No CPU graphs. No notification feed. No kanban board.
+If it isn't about time, it doesn't live in the cove.
 
-```
-src/                  Svelte frontend
-  App.svelte          The island UI and animations
-  app.css             Tailwind import and global styles
-  main.ts             App entry point
-src-tauri/            Rust / Tauri backend
-  src/lib.rs          Window setup and resize command
-  src/main.rs         Desktop entry point
-  tauri.conf.json     Window and bundle configuration
-```
+---
 
-## Requirements
+## Get started
+
+**Requirements**
 
 - [Bun](https://bun.sh/)
 - [Rust](https://www.rust-lang.org/tools/install)
-- Tauri's Windows prerequisites (WebView2, MSVC build tools)
 
-## Development
-
-Install dependencies:
+**Install dependencies**
 
 ```sh
 bun i
 ```
 
-Run the app in dev:
+**Run in dev**
 
 ```sh
 bun tauri dev
 ```
 
-Build a release:
+**Build a release**
 
 ```sh
 bun tauri build
 ```
+
+## Built with
+
+[Tauri](https://tauri.app/) · [Svelte](https://svelte.dev/) · TypeScript · Vite · [GSAP](https://gsap.com) · [Tailwind CSS](https://tailwindcss.com/)
+
+## License
+
+[MIT](LICENSE)
