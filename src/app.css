@@ -127,7 +127,7 @@ body,
 /* ---------- Panels ---------- */
 .slider-track {
     transition: transform 0.45s var(--ease);
-    @apply flex w-full h-full will-change-transform;
+    @apply flex w-full h-full;
 }
 .panel {
     @apply flex flex-none w-full h-full p-2.5 pt-1.5;

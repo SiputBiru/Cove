@@ -21,6 +21,19 @@
 
     let clockTimer: ReturnType<typeof setTimeout> | undefined;
 
+    let lowMemory = false;
+    let ready = false;
+
+    async function setIdle(idle: boolean) {
+        if (idle === lowMemory) return;
+        lowMemory = idle;
+        try {
+            await invoke("set_idle", { idle });
+        } catch (error) {
+            console.error("set_idle failed:", error);
+        }
+    }
+
     function scheduleClock() {
         time = new Date();
         clockTimer = setTimeout(
@@ -30,6 +43,7 @@
     }
 
     onMount(() => {
+        ready = true;
         scheduleClock();
 
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -60,6 +74,8 @@
         day: "numeric",
     });
 
+    $: if (ready) setIdle(!open);
+
     const nextFrame = () => new Promise(requestAnimationFrame);
 
     async function toggle() {
@@ -71,6 +87,7 @@
                 open = false;
                 return;
             }
+            setIdle(false);
             await invoke("resize_island", SIZE.open);
             await nextFrame();
             await nextFrame();
@@ -100,7 +117,7 @@
     <div
         role="button"
         tabindex="0"
-        class="island relative text-white cursor-pointer will-change-[width,height,border-radius] transform-gpu"
+        class="island relative text-white cursor-pointer"
         class:open
         on:click={toggle}
         on:keydown={buttonLike}
@@ -111,17 +128,9 @@
         >
             <!-- Compact view -->
             <div
-                class="compact-view absolute top-2 z-20 w-full px-5 flex justify-between items-center text-[13px] font-semibold tabular-nums"
+                class="compact-view absolute top-2 z-20 w-full px-5 flex justify-center items-center text-[13px] font-semibold tabular-nums"
                 class:is-hidden={open}
             >
-                <div class="flex justify-center items-center ml-0.5">
-                    <div
-                        class="absolute size-2.5 bg-accent rounded-full"
-                    ></div>
-                    <div
-                        class="absolute size-3 bg-accent rounded-full animate-ping"
-                    ></div>
-                </div>
                 <span>{timeString}</span>
             </div>
 

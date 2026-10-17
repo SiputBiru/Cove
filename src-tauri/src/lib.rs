@@ -53,6 +53,41 @@ fn resize_island(window: tauri::WebviewWindow, width: f64, height: f64) -> Resul
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
+fn set_webview_memory_level(window: &tauri::WebviewWindow, low: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL,
+    };
+    use windows::core::Interface;
+
+    let target = COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL(if low { 1 } else { 0 });
+
+    let _ = window.with_webview(move |webview| {
+        let result = unsafe {
+            webview
+                .controller()
+                .CoreWebView2()
+                .and_then(|core| core.cast::<ICoreWebView2_19>())
+                .and_then(|memory| memory.SetMemoryUsageTargetLevel(target))
+        };
+
+        if let Err(error) = result {
+            log::warn!("webview2 memory usage target unavailable: {error}");
+        }
+    });
+}
+
+#[tauri::command]
+fn set_idle(window: tauri::WebviewWindow, idle: bool) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    set_webview_memory_level(&window, idle);
+
+    #[cfg(not(target_os = "windows"))]
+    let _ = (window, idle);
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -89,7 +124,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![resize_island])
+        .invoke_handler(tauri::generate_handler![resize_island, set_idle])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
 }
