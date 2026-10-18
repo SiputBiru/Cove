@@ -20,12 +20,12 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,
-        "shadow": false
+        "shadow": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-gpu"
       }
     ],
     "security": {
-      "csp": null,
-      "assetProtocol": { "enable": true, "scope": [] }
+      "csp": null
     }
   },
   "bundle": {
