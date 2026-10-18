@@ -1,6 +1,6 @@
 [package]
 name = "Cove"
-version = "0.1.0"
+version = "0.5.0"
 description = "Time, held. A calm Dynamic Island-style overlay for your desktop."
 authors = ["Nobbel"]
 license = "MIT"
@@ -21,12 +21,15 @@ tauri-build = { version = "2.7.2", features = [] }
 debug = "line-tables-only"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52", features = [
+windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging"
 ] }
 webview2-com = "0.39"
 windows = "0.62"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-autostart = "2.7.0"
 
 [dependencies]
 log = "0.4"

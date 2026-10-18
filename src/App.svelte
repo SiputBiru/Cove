@@ -34,9 +34,9 @@
     }
 
     onMount(() => {
-        invoke("low_memory", { idle: true }).catch((error) =>
-            console.error("low_memory failed:", error),
-        );
+      invoke("low_memory").catch((error) =>
+          console.error("low_memory failed:", error),
+      );
         scheduleClock();
 
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();

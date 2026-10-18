@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cove",
-  "version": "0.1.0",
+  "version": "0.5.0",
   "identifier": "com.nobberu.cove",
   "build": {
     "frontendDist": "../dist",
@@ -21,7 +21,7 @@
         "skipTaskbar": true,
         "resizable": false,
         "shadow": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-gpu"
+           "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-gpu --js-flags=\"--jitless --scavenger_max_new_space_capacity_mb=4\""
       }
     ],
     "security": {
@@ -38,8 +38,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "android": {
-      "debugApplicationIdSuffix": ".debug"
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico"
+      }
     }
   }
 }

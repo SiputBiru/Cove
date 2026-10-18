@@ -1,4 +1,5 @@
-import gsap from 'gsap';
+type Gsap = typeof import('gsap').gsap;
+type QuickTo = ReturnType<Gsap['quickTo']>;
 
 type MagneticOptions = {
 	strength?: number;
@@ -7,6 +8,13 @@ type MagneticOptions = {
 	ease?: string;
 };
 
+let gsapPromise: Promise<Gsap> | undefined;
+
+function loadGsap(): Promise<Gsap> {
+	gsapPromise ??= import('gsap').then((m) => m.gsap);
+	return gsapPromise;
+}
+
 export function magnetic(
 	node: HTMLElement,
 	{ strength = 0.075, max = 12, duration = 0.4, ease = 'power2.out' }: MagneticOptions = {}
@@ -14,10 +22,27 @@ export function magnetic(
 	const zone = node.parentElement;
 	if (!zone) return {};
 
-	const xTo = gsap.quickTo(node, 'x', { duration, ease });
-	const yTo = gsap.quickTo(node, 'y', { duration, ease });
+	let gsap: Gsap | undefined;
+	let xTo: QuickTo | undefined;
+	let yTo: QuickTo | undefined;
+	let destroyed = false;
+
+	let loading = false;
+	
+	const onEnter = () => {
+		if (gsap || loading) return;
+		loading = true;
+		loadGsap().then((g) => {
+			if (destroyed) return;
+			gsap = g;
+			xTo = g.quickTo(node, 'x', { duration, ease });
+			yTo = g.quickTo(node, 'y', { duration, ease });
+		});
+	};
 
 	const onMove = (e: PointerEvent) => {
+		if (!xTo || !yTo) return;
+
 		const rect = zone.getBoundingClientRect();
 		const dx = e.clientX - (rect.left + rect.width / 2);
 		const dy = e.clientY - (rect.top + rect.height / 2);
@@ -30,18 +55,21 @@ export function magnetic(
 	};
 
 	const onLeave = () => {
-		xTo(0);
-		yTo(0);
+		xTo?.(0);
+		yTo?.(0);
 	};
 
+	zone.addEventListener('pointerenter', onEnter);
 	zone.addEventListener('pointermove', onMove);
 	zone.addEventListener('pointerleave', onLeave);
 
 	return {
 		destroy() {
+			destroyed = true;
+			zone.removeEventListener('pointerenter', onEnter);
 			zone.removeEventListener('pointermove', onMove);
 			zone.removeEventListener('pointerleave', onLeave);
-			gsap.killTweensOf(node);
+			gsap?.killTweensOf(node);
 		}
 	};
 }

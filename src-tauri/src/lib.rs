@@ -2,9 +2,10 @@ use std::thread;
 use std::time::Duration;
 use tauri::{
     Manager,
-    menu::{Menu, MenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
@@ -95,6 +96,10 @@ fn low_memory(window: tauri::WebviewWindow) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -107,17 +112,40 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             center_top(&window)?;
 
+            let autostart_item = CheckMenuItem::with_id(
+                app,
+                "autostart",
+                "Start at login",
+                true,
+                app.autolaunch().is_enabled().unwrap_or(false),
+                None::<&str>,
+            )?;
+            let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Cove", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
+            let menu = Menu::with_items(app, &[&autostart_item, &separator, &quit])?;
+
+            let autostart_handle = autostart_item.clone();
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("Cove")
                 .menu(&menu)
-                .on_menu_event(|app, event| {
-                    if event.id.as_ref() == "quit" {
-                        app.exit(0);
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "quit" => app.exit(0),
+                    "autostart" => {
+                        let manager = app.autolaunch();
+                        let result = if manager.is_enabled().unwrap_or(false) {
+                            manager.disable()
+                        } else {
+                            manager.enable()
+                        };
+                        if let Err(error) = result {
+                            log::warn!("autostart toggle failed: {error}");
+                        }
+                        let _ = autostart_handle
+                            .set_checked(manager.is_enabled().unwrap_or(false));
                     }
+                    _ => {}
                 })
                 .build(app)?;
 
