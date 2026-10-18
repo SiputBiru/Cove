@@ -1,6 +1,8 @@
 <script lang="ts">
     import "./app.css";
     import { magnetic } from "./lib/magnetic";
+    import { remaining } from "./lib/todos";
+    import Todo from "./lib/Todo.svelte";
 
     import { invoke } from "@tauri-apps/api/core";
 
@@ -10,9 +12,11 @@
         compact: { width: 480, height: 32 },
         open: { width: 480, height: 175 },
     };
-    const TABS = ["Clock", "Todo", "Pomodoro"];
+    const TABS = ["Clock", "Todo", "Pomodoro", "Shelf"];
 
     let open = false;
+    let wide = false;
+    let windowTall = false;
     let activeTab = 0;
     let time = new Date();
 
@@ -20,18 +24,6 @@
     let locked = false;
 
     let clockTimer: ReturnType<typeof setTimeout> | undefined;
-
-    let lowMemory = false;
-
-    async function setIdle(idle: boolean) {
-        if (idle === lowMemory) return;
-        lowMemory = idle;
-        try {
-            await invoke("set_idle", { idle });
-        } catch (error) {
-            console.error("set_idle failed:", error);
-        }
-    }
 
     function scheduleClock() {
         time = new Date();
@@ -42,7 +34,9 @@
     }
 
     onMount(() => {
-        setIdle(true);
+        invoke("low_memory", { idle: true }).catch((error) =>
+            console.error("low_memory failed:", error),
+        );
         scheduleClock();
 
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -75,6 +69,18 @@
 
     const nextFrame = () => new Promise(requestAnimationFrame);
 
+    let hoverTimer: ReturnType<typeof setTimeout> | undefined;
+
+    function onEnter() {
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => (wide = true), 100);
+    }
+
+    function onLeave() {
+        clearTimeout(hoverTimer);
+        wide = false;
+    }
+
     async function toggle() {
         if (locked) return;
         locked = true;
@@ -84,11 +90,11 @@
                 open = false;
                 return;
             }
-            setIdle(false);
             await invoke("resize_island", SIZE.open);
             await nextFrame();
             await nextFrame();
             open = true;
+            windowTall = true;
         } finally {
             setTimeout(() => (locked = false), COOLDOWN_MS);
         }
@@ -104,9 +110,9 @@
 
     function onTransitionEnd(e: TransitionEvent) {
         if (e.target !== e.currentTarget) return;
-        if (e.propertyName === "width" && !open) {
-            invoke("resize_island", SIZE.compact).then(() => setIdle(true));
-        }
+        if (e.propertyName !== "width" || open || !windowTall) return;
+        windowTall = false;
+        invoke("resize_island", SIZE.compact);
     }
 </script>
 
@@ -115,9 +121,12 @@
         role="button"
         tabindex="0"
         class="island relative text-white cursor-pointer"
+        class:wide
         class:open
         on:click={toggle}
         on:keydown={buttonLike}
+        on:mouseenter={onEnter}
+        on:mouseleave={onLeave}
         on:transitionend={onTransitionEnd}
     >
         <div
@@ -128,7 +137,18 @@
                 class="compact-view absolute top-2 z-20 w-full px-5 flex justify-center items-center text-[13px] font-semibold tabular-nums"
                 class:is-hidden={open}
             >
+                <span class="compact-wide">{dateString}</span>
                 <span>{timeString}</span>
+                <span class="compact-wide right">
+                    {#if $remaining === 0}
+                        all clear
+                    {:else}
+                        <span>
+                            <span class="text-accent text-[13px]">{$remaining}</span>
+                            {$remaining === 1 ? "task" : "tasks"} left
+                        </span>
+                    {/if}
+                </span>
             </div>
 
             <!-- Tab nav -->
@@ -171,8 +191,7 @@
 
                     <div class="panel">
                         <div class="panel-box">
-                            <span class="title">Todo Tasks</span>
-                            <span class="subtitle">Example</span>
+                            <Todo />
                         </div>
                     </div>
 
@@ -180,6 +199,12 @@
                         <div class="panel-box">
                             <span class="title">Pomodoro</span>
                             <span class="start-pill">Start</span>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-box">
+                            <span class="text-sm">Temporarily saved files</span>
                         </div>
                     </div>
                 </div>

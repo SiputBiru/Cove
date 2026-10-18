@@ -1,16 +1,16 @@
 use std::thread;
 use std::time::Duration;
 use tauri::{
+    Manager,
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager,
 };
 
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    SetWindowPos, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
 };
 
 #[cfg(target_os = "windows")]
@@ -58,13 +58,13 @@ fn resize_island(window: tauri::WebviewWindow, width: f64, height: f64) -> Resul
 }
 
 #[cfg(target_os = "windows")]
-fn set_webview_memory_level(window: &tauri::WebviewWindow, low: bool) {
+fn lower_webview_memory(window: &tauri::WebviewWindow) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL,
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL, ICoreWebView2_19,
     };
     use windows::core::Interface;
 
-    let target = COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL(if low { 1 } else { 0 });
+    let target = COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL(1);
 
     let _ = window.with_webview(move |webview| {
         let result = unsafe {
@@ -82,12 +82,12 @@ fn set_webview_memory_level(window: &tauri::WebviewWindow, low: bool) {
 }
 
 #[tauri::command]
-fn set_idle(window: tauri::WebviewWindow, idle: bool) -> Result<(), String> {
+fn low_memory(window: tauri::WebviewWindow) -> Result<(), String> {
     #[cfg(target_os = "windows")]
-    set_webview_memory_level(&window, idle);
+    lower_webview_memory(&window);
 
     #[cfg(not(target_os = "windows"))]
-    let _ = (window, idle);
+    let _ = window;
 
     Ok(())
 }
@@ -133,16 +133,18 @@ pub fn run() {
                         }
                     });
 
-                    thread::spawn(move || loop {
-                        force_topmost(hwnd_ptr);
-                        thread::sleep(Duration::from_millis(500));
+                    thread::spawn(move || {
+                        loop {
+                            force_topmost(hwnd_ptr);
+                            thread::sleep(Duration::from_millis(500));
+                        }
                     });
                 }
             }
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![resize_island, set_idle])
+        .invoke_handler(tauri::generate_handler![resize_island, low_memory])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
 }
