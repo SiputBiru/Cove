@@ -4,7 +4,9 @@
 
 <h1 align="center">Cove</h1>
 
-</p><p align="center">
+<p align="center">Time, held.</p>
+
+<p align="center">
   <a href="https://github.com/thatshubham/no-ai">
     <img src="https://img.shields.io/badge/No_AI-Generated_Content-red" alt="No AI Generated Content">
   </a>
