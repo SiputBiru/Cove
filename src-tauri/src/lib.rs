@@ -1,4 +1,6 @@
+#[cfg(target_os = "windows")]
 use std::thread;
+#[cfg(target_os = "windows")]
 use std::time::Duration;
 use tauri::{
     Manager,
@@ -17,8 +19,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 #[cfg(target_os = "windows")]
 const HWND_TOPMOST: HWND = -1isize as HWND;
 
+#[cfg(target_os = "windows")]
 fn force_topmost(hwnd_ptr: isize) {
-    #[cfg(target_os = "windows")]
     unsafe {
         SetWindowPos(
             hwnd_ptr as _,

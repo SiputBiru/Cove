@@ -46,7 +46,10 @@
             if (!document.hidden) scheduleClock();
         };
 
-        if (window.location.hostname === "tauri.localhost") {
+        const isTauri =
+            window.location.protocol === "tauri:" ||
+            window.location.hostname === "tauri.localhost";
+        if (isTauri) {
             window.addEventListener("contextmenu", handleContextMenu);
         }
         document.addEventListener("visibilitychange", onVisibility);

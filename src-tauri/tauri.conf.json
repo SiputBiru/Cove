@@ -21,7 +21,7 @@
         "skipTaskbar": true,
         "resizable": false,
         "shadow": false,
-           "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-gpu --js-flags=\"--jitless --scavenger_max_new_space_capacity_mb=4\""
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-gpu --js-flags=\"--jitless --scavenger_max_new_space_capacity_mb=4\""
       }
     ],
     "security": {
