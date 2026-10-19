@@ -186,7 +186,7 @@ body,
 
 /* ---------- Tabs ---------- */
 .top-nav {
-    @apply flex gap-1 pt-2.5 ml-4 z-10;
+    @apply flex gap-1 pt-2.5 px-4 z-10;
     --from-scale: 0.8;
 }
 .nav-pill {

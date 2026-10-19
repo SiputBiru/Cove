@@ -1,0 +1,11 @@
+:root[data-platform="macos"] .island {
+    width: 240px;
+}
+
+:root[data-platform="macos"] .island.wide {
+    width: 320px;
+}
+
+:root[data-platform="macos"] .island.open {
+    width: 450px;
+}

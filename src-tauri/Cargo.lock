@@ -7,6 +7,7 @@ name = "Cove"
 version = "0.5.0"
 dependencies = [
  "log",
+ "objc2",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",

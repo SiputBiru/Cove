@@ -34,6 +34,18 @@ fn force_topmost(hwnd_ptr: isize) {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn raise_above_menu_bar(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    if let Ok(ptr) = window.ns_window() {
+        unsafe {
+            let ns_window = &*(ptr as *mut AnyObject);
+            let _: () = msg_send![ns_window, setLevel: 25_isize];
+        }
+    }
+}
+
 fn center_top(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     if let Some(monitor) = window.primary_monitor()? {
         let screen_w = monitor.size().width as i32;
@@ -112,6 +124,9 @@ pub fn run() {
             }
 
             let window = app.get_webview_window("main").unwrap();
+
+            #[cfg(target_os = "macos")]
+            raise_above_menu_bar(&window);
             center_top(&window)?;
 
             let autostart_item = CheckMenuItem::with_id(

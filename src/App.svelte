@@ -1,6 +1,8 @@
 <script lang="ts">
     import "./app.css";
+    import "./macos.css";
     import { magnetic } from "./lib/magnetic";
+    import { platform } from "./lib/platform";
     import { remaining } from "./lib/todos";
     import Todo from "./lib/Todo.svelte";
 
@@ -34,9 +36,9 @@
     }
 
     onMount(() => {
-      invoke("low_memory").catch((error) =>
-          console.error("low_memory failed:", error),
-      );
+        invoke("low_memory").catch((error) =>
+            console.error("low_memory failed:", error),
+        );
         scheduleClock();
 
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();
@@ -133,21 +135,30 @@
         on:transitionend={onTransitionEnd}
     >
         <div
-            class="relative w-full h-full flex flex-col items-center font-sans overflow-hidden"
+            class="relative w-full h-full flex flex-col items-start font-sans overflow-hidden"
         >
             <!-- Compact view -->
             <div
-                class="compact-view absolute top-2 z-20 w-full px-5 flex justify-center items-center text-[13px] font-semibold tabular-nums"
+                class="compact-view absolute top-2 z-20 w-full px-5 flex {platform ===
+                'macos'
+                    ? 'justify-start'
+                    : 'justify-center'} items-center text-[13px] font-semibold tabular-nums"
                 class:is-hidden={open}
             >
-                <span class="compact-wide">{dateString}</span>
+                {#if platform === "macos"}
+                    <!-- render nothing -->
+                {:else}
+                    <span class="compact-wide">{dateString}</span>
+                {/if}
                 <span>{timeString}</span>
                 <span class="compact-wide right">
                     {#if $remaining === 0}
                         all clear
                     {:else}
                         <span>
-                            <span class="text-accent text-[13px]">{$remaining}</span>
+                            <span class="text-accent text-[13px]"
+                                >{$remaining}</span
+                            >
                             {$remaining === 1 ? "task" : "tasks"} left
                         </span>
                     {/if}
@@ -155,17 +166,53 @@
             </div>
 
             <!-- Tab nav -->
-            <div class="reveal top-nav" class:shown={open}>
-                {#each TABS as tab, index}
-                    <button
-                        type="button"
-                        class="nav-pill"
-                        class:active={activeTab === index}
-                        on:click|stopPropagation={() => (activeTab = index)}
-                    >
-                        {tab}
-                    </button>
-                {/each}
+            <div
+                class="reveal top-nav w-full flex {platform === 'macos'
+                    ? 'justify-between'
+                    : 'justify-center'} items-center"
+                class:shown={open}
+            >
+                {#if platform === "macos"}
+                    <div class="flex items-center gap-1">
+                        {#each TABS.slice(0, 2) as tab, index}
+                            <button
+                                type="button"
+                                class="nav-pill"
+                                class:active={activeTab === index}
+                                on:click|stopPropagation={() =>
+                                    (activeTab = index)}
+                            >
+                                {tab}
+                            </button>
+                        {/each}
+                    </div>
+
+                    <div class="flex items-center gap-1">
+                        {#each TABS.slice(2) as tab, i}
+                            {@const index = i + 2}
+                            <button
+                                type="button"
+                                class="nav-pill"
+                                class:active={activeTab === index}
+                                on:click|stopPropagation={() =>
+                                    (activeTab = index)}
+                            >
+                                {tab}
+                            </button>
+                        {/each}
+                    </div>
+                {:else}
+                    {#each TABS as tab, index}
+                        <button
+                            type="button"
+                            class="nav-pill"
+                            class:active={activeTab === index}
+                            on:click|stopPropagation={() => (activeTab = index)}
+                        >
+                            {tab}
+                        </button>
+                    {/each}
+                {/if}
             </div>
 
             <!-- Sliding panels -->
