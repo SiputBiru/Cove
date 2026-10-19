@@ -4,7 +4,11 @@
 
 <h1 align="center">Cove</h1>
 
-<p align="center"><b>Time, held.</b></p>
+</p><p align="center">
+  <a href="https://github.com/thatshubham/no-ai">
+    <img src="https://img.shields.io/badge/No_AI-Generated_Content-red" alt="No AI Generated Content">
+  </a>
+</p>
 
 A small island at the top of your screen for the things that matter about time: what time it is, what needs it, and how you're spending it. Hover for a quick glance, click to open, click again, get back to your work.
 
