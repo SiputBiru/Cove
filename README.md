@@ -1,79 +1,62 @@
 <h1 align="center">
-  <img src="assets/cove.png" alt="Cove" width="150">
+  <br>
+  <a href="https://github.com/nobberu/cove"><img src="assets/cove.png" alt="Cove" width="150"></a>
+  <br>
+  Cove
+  <br>
 </h1>
 
-<h1 align="center">Cove</h1>
+<h3 align="center">
+  Time, held.
+</h3>
 
-<p align="center">Time, held.</p>
+<br>
 
 <p align="center">
   <a href="https://github.com/thatshubham/no-ai">
     <img src="https://img.shields.io/badge/No_AI-Generated_Content-red" alt="No AI Generated Content">
   </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License MIT">
+  </a>
 </p>
 
-A small island at the top of your screen for the things that matter about time: what time it is, what needs it, and how you're spending it. Hover for a quick glance, click to open, click again, get back to your work.
+Say hello to **Cove**, a small island at the top of your screen for the things that matter about time. What time it is, what needs it, and how you're spending it. Hover for a quick glance, click to open, click again, and get right back to work.
 
-Not a Swiss Army knife. Cove does less, on purpose.
+Not a Swiss Army knife, Cove does less, on purpose. Most notch apps keep adding widgets until they become another dashboard; Cove stays minimal, light, and sheltered.
 
-## Why Cove
-
-Most notch apps keep adding widgets until they become another dashboard. Cove stays minimal, small, and sheltered.
-
-- **Quiet by default.** It floats above your desktop, stays out of the taskbar, and never steals focus.
-- **Glanceable.** Collapsed, it shows just the time. Hover for the date and how many tasks are left, and open it only when you need more.
-- **Light and fast.** Built with Tauri and Svelte, and WebView2 usage has been optimized to use less RAM.
-- **Smooth.** Opening is spring-animated and anchored to the top of the screen like a real notch.
-- **Private.** Your tasks are saved locally on your machine.
-
-## What's inside
-
-- **Clock:** the time and date, always one glance away.
-- **Todo:** add tasks, check them off, and see how many are left. _(in progress)_
-- **Pomodoro:** focus in sessions. _(in progress)_
-
-## Coming soon
-
-- Global hotkey that drops a task straight into Todo
-- Animation when a pomodoro session ends
-- Shelf: drop in a file and Cove holds it
-
-## What Cove won't do
-
-No weather. No CPU graphs. No notification feed. No kanban board.
-If it isn't about time, it doesn't live in the cove.
+<p align="center">
+  <!-- Replace with your demo asset if available -->
+  <img src="assets/demo.gif" alt="Cove Demo" />
+</p>
 
 ---
 
-## Get started
+## Features & Highlights
 
-**Requirements**
+- **Quiet by default:** Floats above your desktop, stays out of the taskbar, and never steals focus.
+- **Glanceable:** Collapsed, it shows just the time. Hover for the date and remaining task count.
+- **Light & Fast:** Built with Tauri and Svelte with optimized WebView2 memory usage.
+- **Smooth Animations:** Spring-animated opening, seamlessly anchored to the top of the screen.
+- **Private:** Your tasks stay saved locally on your machine.
 
-- [Bun](https://bun.sh/)
-- [Rust](https://www.rust-lang.org/tools/install)
+---
 
-**Install dependencies**
+## Installation
 
-```sh
-bun i
-```
+Check the [Releases](https://github.com/nobberu/cove/releases) page to download the latest package for your machine:
 
-**Run in dev**
+- **Windows:** Download `.msi` or `.exe`
+- **macOS:** Download `.app.zip`
+- **Linux:** Download `.AppImage` or `.deb`
 
-```sh
-bun tauri dev
-```
+---
 
-**Build a release**
+### macOS Security Setup
 
-```sh
-bun tauri build
-```
+Because Cove is self-signed, macOS will display an unidentified developer warning on first launch.
 
-## Built with
+After moving **Cove** to your `/Applications` folder, run the following command in **Terminal** to bypass quarantine:
 
-[Tauri](https://tauri.app/) · [Svelte](https://svelte.dev/) · TypeScript · Vite · [GSAP](https://gsap.com) · [Tailwind CSS](https://tailwindcss.com/)
-
-## License
-
-[MIT](LICENSE)
+```bash
+xattr -dr com.apple.quarantine "/Applications/Cove.app"
