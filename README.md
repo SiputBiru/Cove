@@ -26,7 +26,6 @@ Say hello to **Cove**, a small island at the top of your screen for the things t
 Not a Swiss Army knife, Cove does less, on purpose. Most notch apps keep adding widgets until they become another dashboard; Cove stays minimal, light, and sheltered.
 
 <p align="center">
-  <!-- Replace with your demo asset if available -->
   <img src="assets/demo.gif" alt="Cove Demo" />
 </p>
 
@@ -60,3 +59,97 @@ After moving **Cove** to your `/Applications` folder, run the following command 
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Cove.app"
+```
+
+## Building from Source
+
+### Prerequisites
+
+Make sure you have the following installed on your system:
+
+- [Bun](https://bun.sh/)
+- [Rust](https://www.rust-lang.org/tools/install)
+
+---
+
+### Setup Steps
+
+1. **Clone the Repository:**
+
+```bash
+git clone [https://github.com/nobberu/cove.git](https://github.com/nobberu/cove.git)
+cd cove
+```
+
+2. **Install Dependencies:**
+
+```bash
+bun i
+```
+
+3. **Run in Development:**
+
+```bash
+bun tauri dev
+```
+
+4. **Build Release Binary:**
+
+```bash
+bun tauri build
+```
+
+---
+
+## What's Inside
+
+- **Clock:** The time and date, always one glance away.
+- **Todo:** Add tasks, check them off, and track what's left.
+- **Pomodoro:** Focus in timed sessions. *(In progress)*
+- **Shelf:** Temporarily save items by dragging it to cove. *(In progress)*
+
+---
+
+## Roadmap
+
+- [x] Clock & date display
+- [x] Spring-animated desktop notch anchor
+- [x] Todo task manager
+- [ ] Pomodoro focus timer
+- [ ] Global hotkey to quick-add tasks
+- [ ] End-of-session Pomodoro animations
+- [ ] Shelf: quick drop-in file holder
+
+---
+
+## What Cove Won't Do
+
+> **Note:** If it isn't directly about time, it doesn't live in the cove.
+>
+> - No weather
+> - No CPU/RAM graphs
+> - No notification feed
+> - No kanban board
+
+---
+
+## Contributing
+
+Contributions, feedback, and ideas are welcome! Feel free to open an issue or submit a pull request.
+
+---
+
+## Acknowledgments & Tech Stack
+
+Cove is built using these tools and frameworks:
+
+- **[Tauri](https://tauri.app/)** — Lightweight desktop runtime engine.
+- **[Svelte](https://svelte.dev/)** — Cybernetically enhanced web apps.
+- **[GSAP](https://gsap.com)** — Ultra-high-performance animations.
+- **[Tailwind CSS](https://tailwindcss.com/)** — Utility-first CSS framework.
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
