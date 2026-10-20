@@ -12,7 +12,7 @@
 
     const SIZE = {
         compact: { width: 480, height: 32 },
-        open: { width: 480, height: 175 },
+        open: { width: 480, height: 205 },
     };
     const TABS = ["Clock", "Todo", "Pomodoro", "Shelf"];
 
@@ -66,8 +66,10 @@
         hour: "2-digit",
         minute: "2-digit",
     });
-    $: dateString = time.toLocaleDateString([], {
+    $: dayString = time.toLocaleDateString([], {
         weekday: "short",
+    });
+    $: dateString = time.toLocaleDateString([], {
         month: "short",
         day: "numeric",
     });
@@ -148,7 +150,7 @@
                 {#if platform === "macos"}
                     <!-- render nothing -->
                 {:else}
-                    <span class="compact-wide">{dateString}</span>
+                    <span class="compact-wide"><span class="text-accent font-bold">{dayString}</span>, {dateString}</span>
                 {/if}
                 <span>{timeString}</span>
                 <span class="compact-wide right">
@@ -156,7 +158,7 @@
                         all clear
                     {:else}
                         <span>
-                            <span class="text-accent text-[13px]"
+                            <span class="text-accent font-bold text-[13px]"
                                 >{$remaining}</span
                             >
                             {$remaining === 1 ? "task" : "tasks"} left
@@ -247,14 +249,15 @@
 
                     <div class="panel">
                         <div class="panel-box">
-                            <span class="title">Pomodoro</span>
+                            <span class="text-[24px]">Pomodoro (unfinished)</span>
                             <span class="start-pill">Start</span>
                         </div>
                     </div>
 
                     <div class="panel">
-                        <div class="panel-box">
-                            <span class="text-sm">Temporarily saved files</span>
+                        <div class="panel-box justify-start!">
+                            <span class="text-[13px] font-regular mt-0.5">Temporarily saved files (unfinished)</span>
+                            <div class="border-2 border-white/35 border-dashed w-full h-full my-2 rounded-2xl"></div>
                         </div>
                     </div>
                 </div>

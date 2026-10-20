@@ -89,7 +89,7 @@ body,
 
 .island.open {
     width: 450px;
-    height: 170px;
+    height: 200px;
     border-radius: 0 0 28px 28px;
     transition:
         width 0.55s var(--spring),
@@ -196,10 +196,10 @@ body,
         scale 0.35s var(--spring);
 }
 .nav-pill:hover {
-    @apply text-white scale-110;
+    @apply text-white/85 scale-110;
 }
 .nav-pill.active {
-    @apply text-white font-bold scale-110;
+    @apply text-accent font-bold scale-110;
 }
 
 /* ---------- Panels ---------- */

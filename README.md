@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="assets/banner.jpg" alt="Cove" width="300">
+  <img src="assets/cove.png" alt="Cove" width="150">
 </h1>
 
 <h1 align="center">Cove</h1>
