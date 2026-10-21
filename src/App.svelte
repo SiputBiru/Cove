@@ -80,12 +80,27 @@
 
     function onEnter() {
         clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(() => (wide = true), 100);
+        hoverTimer = setTimeout(() => (wide = true), 150);
     }
 
     function onLeave() {
         clearTimeout(hoverTimer);
-        wide = false;
+        hoverTimer = setTimeout(() => (wide = false), 350);
+    }
+
+    // scroll panels
+    let wheelLocked = false;
+
+    function scrollNav(event: WheelEvent) {
+        if (wheelLocked) return;
+
+        const delta = event.deltaY || event.deltaX;
+        if (Math.abs(delta) < 10) return;
+
+        wheelLocked = true;
+        setTimeout(() => (wheelLocked = false), 350);
+
+        activeTab = Math.max(0, Math.min(TABS.length - 1, activeTab + Math.sign(delta)));
     }
 
     async function toggle() {
@@ -150,7 +165,9 @@
                 {#if platform === "macos"}
                     <!-- render nothing -->
                 {:else}
-                    <span class="compact-wide"><span class="text-accent font-bold">{dayString}</span>, {dateString}</span>
+                    <span class="compact-wide"
+                        ><span class="text-accent font-bold">{dayString}</span>, {dateString}</span
+                    >
                 {/if}
                 <span>{timeString}</span>
                 <span class="compact-wide right">
@@ -173,6 +190,7 @@
                     ? 'justify-between'
                     : 'justify-center'} items-center"
                 class:shown={open}
+                on:wheel|preventDefault={scrollNav}
             >
                 {#if platform === "macos"}
                     <div class="flex items-center gap-1">
@@ -249,15 +267,23 @@
 
                     <div class="panel">
                         <div class="panel-box">
-                            <span class="text-[24px]">Pomodoro (unfinished)</span>
+                            <span class="text-[24px]"
+                                >Pomodoro (unfinished)</span
+                            >
                             <span class="start-pill">Start</span>
                         </div>
                     </div>
 
                     <div class="panel">
                         <div class="panel-box justify-start!">
-                            <span class="text-[13px] font-regular mt-0.5">Temporarily saved files (unfinished)</span>
-                            <div class="border-2 border-white/35 border-dashed w-full h-full my-2 rounded-2xl"></div>
+                            <div
+                                class="flex justify-center items-center border-2 border-white/35 border-dashed w-full h-full m-2 rounded-2xl"
+                            >
+                                <span
+                                    class="text-[13px] font-light text-white/50 mt-0.5"
+                                    >Temporarily saved files (unfinished)</span
+                                >
+                            </div>
                         </div>
                     </div>
                 </div>
