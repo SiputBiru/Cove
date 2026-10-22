@@ -1,7 +1,10 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_os = "windows")]
 use std::thread;
 #[cfg(target_os = "windows")]
-use std::time::Duration;
+use std::time::{Duration, Instant};
+#[cfg(target_os = "windows")]
+use tauri::Emitter;
 use tauri::{
     Manager,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -10,15 +13,55 @@ use tauri::{
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::Foundation::{HWND, POINT};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::UI::Shell::SHQueryUserNotificationState;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
+    GWL_EXSTYLE, GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
+    SM_CXSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowLongPtrW, SetWindowPos,
+    WS_EX_NOACTIVATE,
 };
+
+// ---------- Shared state ----------
+
+// true while the island is expanded (by frontend)
+static OPEN: AtomicBool = AtomicBool::new(false);
+// true while a fullscreen app that supports the peek is running
+static FS_MODE: AtomicBool = AtomicBool::new(false);
+// true while the tiny island is showing above a fullscreen app
+#[cfg(target_os = "windows")]
+static PEEK: AtomicBool = AtomicBool::new(false);
+
+// ---------- Windows: z-order + fullscreen peek ----------
 
 #[cfg(target_os = "windows")]
 const HWND_TOPMOST: HWND = -1isize as HWND;
 
+#[cfg(target_os = "windows")]
+const HWND_NOTOPMOST: HWND = -2isize as HWND;
+
+// value by SHQueryUserNotificationState
+#[cfg(target_os = "windows")]
+const STATE_BUSY: i32 = 2; // fullscreen app, peek is allowed
+#[cfg(target_os = "windows")]
+const STATE_D3D_FULLSCREEN: i32 = 3; // exclusive fullscreen game, never touch it
+#[cfg(target_os = "windows")]
+const STATE_PRESENTATION: i32 = 4; // presentation mode, stay hidden
+#[cfg(target_os = "windows")]
+const STATE_NORMAL: i32 = 5;
+
+// Peek trigger zone (logical px, scaled by DPI at runtime)
+#[cfg(target_os = "windows")]
+const TRIGGER_HALF_WIDTH: f64 = 110.0; // horizontal hotzone: 110px left/right from center
+#[cfg(target_os = "windows")]
+const TRIGGER_HEIGHT: i32 = 2; // vertical hotzone: 2px from top edge to trigger
+#[cfg(target_os = "windows")]
+const KEEP_HALF_WIDTH: f64 = 130.0; // rxpanded keep-alive zone width while peeking
+#[cfg(target_os = "windows")]
+const KEEP_HEIGHT: f64 = 28.0; // expanded keep-alive zone height while peeking
+
+// force to stay above all normal apps without stealing focus
 #[cfg(target_os = "windows")]
 fn force_topmost(hwnd_ptr: isize) {
     unsafe {
@@ -34,6 +77,209 @@ fn force_topmost(hwnd_ptr: isize) {
     }
 }
 
+// drop topmost flag and set Cove right behind the foreground window
+#[cfg(target_os = "windows")]
+fn force_normal(hwnd_ptr: isize) {
+    unsafe {
+        SetWindowPos(
+            hwnd_ptr as _,
+            HWND_NOTOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+
+        let fg = GetForegroundWindow();
+        if !fg.is_null() && fg as isize != hwnd_ptr {
+            SetWindowPos(
+                hwnd_ptr as _,
+                fg,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
+        }
+    }
+}
+
+// prevent Cove from stealing window focus when clicked during fullscreen modes
+#[cfg(target_os = "windows")]
+fn set_no_activate(hwnd_ptr: isize, on: bool) {
+    unsafe {
+        let hwnd = hwnd_ptr as HWND;
+        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let flag = WS_EX_NOACTIVATE as isize;
+        let new_style = if on { style | flag } else { style & !flag };
+        if new_style != style {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_style);
+        }
+    }
+}
+
+// Windows API commands for fullscreen state
+#[cfg(target_os = "windows")]
+fn notification_state() -> i32 {
+    let mut state: i32 = STATE_NORMAL;
+    let hr = unsafe { SHQueryUserNotificationState(&mut state) };
+    if hr >= 0 { state } else { STATE_NORMAL }
+}
+
+// check if cursor currently in the top-center hover activation zones
+#[cfg(target_os = "windows")]
+fn cursor_zones(scale: f64) -> (bool, bool) {
+    unsafe {
+        let mut pt = POINT { x: 0, y: 0 };
+        if GetCursorPos(&mut pt) == 0 || pt.y < 0 {
+            return (false, false);
+        }
+        let center_x = GetSystemMetrics(SM_CXSCREEN) / 2;
+        let dx = (pt.x - center_x).abs() as f64;
+        let in_trigger = pt.y <= TRIGGER_HEIGHT && dx <= TRIGGER_HALF_WIDTH * scale;
+        let in_keep = (pt.y as f64) <= KEEP_HEIGHT * scale && dx <= KEEP_HALF_WIDTH * scale;
+        (in_trigger, in_keep)
+    }
+}
+
+// update local peek state and send frontend event when state changes
+#[cfg(target_os = "windows")]
+fn set_peek(app: &tauri::AppHandle, peek: bool) {
+    if PEEK.swap(peek, Ordering::Relaxed) != peek {
+        let _ = app.emit("peek", peek);
+    }
+}
+
+// reraise window to topmost only if current screen state permits it
+#[cfg(target_os = "windows")]
+fn raise_if_allowed(hwnd_ptr: isize) {
+    let allowed = match notification_state() {
+        STATE_BUSY => OPEN.load(Ordering::Relaxed) || PEEK.load(Ordering::Relaxed),
+        STATE_D3D_FULLSCREEN | STATE_PRESENTATION => false,
+        _ => true,
+    };
+    if allowed {
+        force_topmost(hwnd_ptr);
+    }
+}
+
+// background loop managing z-order, dock-fighting, and mouse-hover peek logic
+#[cfg(target_os = "windows")]
+fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
+    const TICK: Duration = Duration::from_millis(80);
+    const RECHECK_STATE: Duration = Duration::from_millis(500);
+    const RERAISE: Duration = Duration::from_millis(500);
+    const HOLD: Duration = Duration::from_millis(300); // hover required before peek triggers
+    const LEAVE: Duration = Duration::from_millis(400); // grace period before hiding peek
+    const HIDE_DELAY: Duration = Duration::from_millis(500); // allow exit animation to finish before window moves
+
+    let mut state = notification_state();
+    let mut applied_state = -1;
+    let mut last_state_check = Instant::now();
+    let mut last_raise = Instant::now();
+    let mut raised = false;
+    let mut hover_since: Option<Instant> = None;
+    let mut away_since: Option<Instant> = None;
+    let mut hide_at: Option<Instant> = None;
+
+    loop {
+        if last_state_check.elapsed() >= RECHECK_STATE {
+            state = notification_state();
+            last_state_check = Instant::now();
+        }
+
+        // react when Windows changes fullscreen
+        if state != applied_state {
+            applied_state = state;
+            log::info!("notification state: {state}");
+
+            let fs = state == STATE_BUSY;
+            if fs != FS_MODE.load(Ordering::Relaxed) {
+                FS_MODE.store(fs, Ordering::Relaxed);
+                let _ = app.emit("fullscreen", fs);
+            }
+
+            set_no_activate(hwnd_ptr, fs);
+            set_peek(&app, false);
+            hover_since = None;
+            away_since = None;
+            hide_at = None;
+
+            match state {
+                STATE_BUSY => {}
+                STATE_D3D_FULLSCREEN | STATE_PRESENTATION => {
+                    force_normal(hwnd_ptr);
+                    raised = false;
+                }
+                _ => {
+                    force_topmost(hwnd_ptr);
+                    raised = true;
+                    last_raise = Instant::now();
+                }
+            }
+        }
+
+        // active state
+        match state {
+            STATE_BUSY => {
+                let open = OPEN.load(Ordering::Relaxed);
+
+                // handle hover peek trigger when island is collapsed
+                if !open {
+                    let (in_trigger, in_keep) = cursor_zones(scale);
+
+                    if PEEK.load(Ordering::Relaxed) {
+                        if in_keep {
+                            away_since = None;
+                        } else if away_since.get_or_insert_with(Instant::now).elapsed() >= LEAVE {
+                            set_peek(&app, false);
+                            away_since = None;
+                        }
+                    } else if in_trigger {
+                        if hover_since.get_or_insert_with(Instant::now).elapsed() >= HOLD {
+                            set_peek(&app, true);
+                            hover_since = None;
+                        }
+                    } else {
+                        hover_since = None;
+                    }
+                }
+
+                let want = open || PEEK.load(Ordering::Relaxed);
+                if want {
+                    hide_at = None;
+                    if !raised || last_raise.elapsed() >= RERAISE {
+                        force_topmost(hwnd_ptr);
+                        raised = true;
+                        last_raise = Instant::now();
+                    }
+                } else if raised {
+                    let deadline = *hide_at.get_or_insert_with(|| Instant::now() + HIDE_DELAY);
+                    if Instant::now() >= deadline {
+                        force_normal(hwnd_ptr);
+                        raised = false;
+                        hide_at = None;
+                    }
+                }
+            }
+            STATE_D3D_FULLSCREEN | STATE_PRESENTATION => {}
+            _ => {
+                if last_raise.elapsed() >= RERAISE {
+                    force_topmost(hwnd_ptr);
+                    last_raise = Instant::now();
+                }
+            }
+        }
+
+        thread::sleep(TICK);
+    }
+}
+
+// ---------- macOS ----------
+
+// elevate macOS window level to 25
 #[cfg(target_os = "macos")]
 fn raise_above_menu_bar(window: &tauri::WebviewWindow) {
     use objc2::{msg_send, runtime::AnyObject};
@@ -46,6 +292,9 @@ fn raise_above_menu_bar(window: &tauri::WebviewWindow) {
     }
 }
 
+// ---------- Shared helper functions & Tauri Commands ----------
+
+// center window horizontally and set to very top edge of the primary monitor
 fn center_top(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     if let Some(monitor) = window.primary_monitor()? {
         let screen_w = monitor.size().width as i32;
@@ -57,6 +306,7 @@ fn center_top(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     Ok(())
 }
 
+// IPC - resize the island and recenters it at the top
 #[tauri::command]
 fn resize_island(window: tauri::WebviewWindow, width: f64, height: f64) -> Result<(), String> {
     window
@@ -66,12 +316,25 @@ fn resize_island(window: tauri::WebviewWindow, width: f64, height: f64) -> Resul
 
     #[cfg(target_os = "windows")]
     if let Ok(hwnd) = window.hwnd() {
-        force_topmost(hwnd.0 as isize);
+        raise_if_allowed(hwnd.0 as isize);
     }
 
     Ok(())
 }
 
+// IPC - for frontend when island expands or collapses
+#[tauri::command]
+fn set_open(open: bool) {
+    OPEN.store(open, Ordering::Relaxed);
+}
+
+// IPC - check if is in fullscreen
+#[tauri::command]
+fn fullscreen_mode() -> bool {
+    FS_MODE.load(Ordering::Relaxed)
+}
+
+// restrict RAM to low target
 #[cfg(target_os = "windows")]
 fn lower_webview_memory(window: &tauri::WebviewWindow) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
@@ -96,6 +359,7 @@ fn lower_webview_memory(window: &tauri::WebviewWindow) {
     });
 }
 
+// IPC - trim webview memory
 #[tauri::command]
 fn low_memory(window: tauri::WebviewWindow) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -106,6 +370,8 @@ fn low_memory(window: tauri::WebviewWindow) -> Result<(), String> {
 
     Ok(())
 }
+
+// ---------- App init ----------
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -129,6 +395,7 @@ pub fn run() {
             raise_above_menu_bar(&window);
             center_top(&window)?;
 
+            // Tray menu setup
             let autostart_item = CheckMenuItem::with_id(
                 app,
                 "autostart",
@@ -159,37 +426,39 @@ pub fn run() {
                         if let Err(error) = result {
                             log::warn!("autostart toggle failed: {error}");
                         }
-                        let _ = autostart_handle
-                            .set_checked(manager.is_enabled().unwrap_or(false));
+                        let _ = autostart_handle.set_checked(manager.is_enabled().unwrap_or(false));
                     }
                     _ => {}
                 })
                 .build(app)?;
 
+            // Init windows background z-order supervisor thread
             #[cfg(target_os = "windows")]
             {
                 if let Ok(hwnd) = window.hwnd() {
                     let hwnd_ptr = hwnd.0 as isize;
+                    let scale = window.scale_factor().unwrap_or(1.0);
+                    let app_handle = app.handle().clone();
 
-                    force_topmost(hwnd_ptr);
+                    raise_if_allowed(hwnd_ptr);
                     window.on_window_event(move |event| {
                         if let tauri::WindowEvent::Focused(_) = event {
-                            force_topmost(hwnd_ptr);
+                            raise_if_allowed(hwnd_ptr);
                         }
                     });
 
-                    thread::spawn(move || {
-                        loop {
-                            force_topmost(hwnd_ptr);
-                            thread::sleep(Duration::from_millis(500));
-                        }
-                    });
+                    thread::spawn(move || z_order_loop(app_handle, hwnd_ptr, scale));
                 }
             }
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![resize_island, low_memory])
+        .invoke_handler(tauri::generate_handler![
+            resize_island,
+            set_open,
+            fullscreen_mode,
+            low_memory
+        ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
 }

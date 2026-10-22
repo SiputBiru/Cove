@@ -26,6 +26,12 @@ body,
     background: transparent;
 }
 
+@property --ear {
+    syntax: "<length>";
+    inherits: true;
+    initial-value: 14px;
+}
+
 /* ---------- Island shell ---------- */
 .island {
     --ear: 14px;
@@ -77,14 +83,26 @@ body,
     width: 180px;
     height: 32px;
     border-radius: 0 0 18px 18px;
-    transition-property: height, width, border-radius;
-    transition-duration: 0.4s;
+    transition-property: height, width, border-radius, --ear, transform;
+    transition-duration: 0.35s, 0.35s, 0.35s, 0.35s, 0.4s, 0.2s;
     transition-timing-function: var(--ease-linear);
 }
 
 .island.wide {
     width: 320px;
     transition-duration: 0.25s;
+}
+
+.island.tiny {
+    --ear: 8px;
+    width: 96px;
+    height: 10px;
+    border-radius: 0 0 10px 10px;
+}
+
+.island.stowed {
+    transform: translateY(-100%);
+    pointer-events: none;
 }
 
 .island.open {
@@ -94,7 +112,8 @@ body,
     transition:
         width 0.55s var(--spring),
         height 0.55s var(--spring) 0.03s,
-        border-radius 0.4s var(--ease-linear);
+        border-radius 0.4s var(--ease-linear),
+        --ear 0.4s var(--ease-linear);
 }
 
 .island::before,
@@ -118,6 +137,12 @@ body,
 .island::after {
     right: calc(var(--ear) * -1);
     --x: 100%;
+}
+.island.tiny::before {
+    --x: 20%;
+}
+.island.tiny::after {
+    --x: 80%;
 }
 
 /* ---------- Compact view ---------- */

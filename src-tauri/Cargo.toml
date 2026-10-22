@@ -23,7 +23,8 @@ debug = "line-tables-only"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
-    "Win32_UI_WindowsAndMessaging"
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
 ] }
 webview2-com = "0.39"
 windows = "0.62"

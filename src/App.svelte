@@ -7,6 +7,7 @@
     import Todo from "./lib/Todo.svelte";
 
     import { invoke } from "@tauri-apps/api/core";
+    import { listen } from "@tauri-apps/api/event";
 
     import { onMount } from "svelte";
 
@@ -21,6 +22,14 @@
     let windowTall = false;
     let activeTab = 0;
     let time = new Date();
+
+    let fs = false;
+
+    let peek = false;
+    $: tiny = fs && !open;
+    $: stowed = fs && !open && !peek;
+    $: if (fs) wide = false;
+    $: if (!fs) peek = false;
 
     const COOLDOWN_MS = 400;
     let locked = false;
@@ -41,6 +50,12 @@
         );
         scheduleClock();
 
+        const unlistenFs = listen<boolean>("fullscreen", (e) => (fs = e.payload));
+        const unlistenPeek = listen<boolean>("peek", (e) => (peek = e.payload));
+        invoke<boolean>("fullscreen_mode")
+            .then((value) => (fs = value))
+            .catch(() => {});
+
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();
 
         const onVisibility = () => {
@@ -57,6 +72,8 @@
         document.addEventListener("visibilitychange", onVisibility);
         return () => {
             clearTimeout(clockTimer);
+            unlistenFs.then((stop) => stop());
+            unlistenPeek.then((stop) => stop());
             document.removeEventListener("visibilitychange", onVisibility);
             window.removeEventListener("contextmenu", handleContextMenu);
         };
@@ -79,6 +96,7 @@
     let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 
     function onEnter() {
+        if (tiny) return;
         clearTimeout(hoverTimer);
         hoverTimer = setTimeout(() => (wide = true), 150);
     }
@@ -112,6 +130,7 @@
                 open = false;
                 return;
             }
+            await invoke("set_open", { open: true });
             await invoke("resize_island", SIZE.open);
             await nextFrame();
             await nextFrame();
@@ -135,6 +154,7 @@
         if (e.propertyName !== "width" || open || !windowTall) return;
         windowTall = false;
         invoke("resize_island", SIZE.compact);
+        invoke("set_open", { open: false });
     }
 </script>
 
@@ -145,6 +165,8 @@
         class="island relative text-white cursor-pointer"
         class:wide
         class:open
+        class:tiny
+        class:stowed
         on:click={toggle}
         on:keydown={buttonLike}
         on:mouseenter={onEnter}
@@ -160,7 +182,7 @@
                 'macos'
                     ? 'justify-start'
                     : 'justify-center'} items-center text-[13px] font-semibold tabular-nums"
-                class:is-hidden={open}
+                class:is-hidden={open || tiny}
             >
                 {#if platform === "macos"}
                     <!-- render nothing -->
