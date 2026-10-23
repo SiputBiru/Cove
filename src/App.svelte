@@ -1,7 +1,6 @@
 <script lang="ts">
     import "./app.css";
     import "./macos.css";
-    import { magnetic } from "./lib/magnetic";
     import { platform } from "./lib/platform";
     import { remaining } from "./lib/todos";
     import Todo from "./lib/Todo.svelte";
@@ -53,12 +52,12 @@
     }
 
     onMount(() => {
-        invoke("low_memory").catch((error) =>
-            console.error("low_memory failed:", error),
-        );
         scheduleClock();
 
-        const unlistenFs = listen<boolean>("fullscreen", (e) => (fs = e.payload));
+        const unlistenFs = listen<boolean>(
+            "fullscreen",
+            (e) => (fs = e.payload),
+        );
         const unlistenPeek = listen<boolean>("peek", (e) => (peek = e.payload));
         invoke<boolean>("fullscreen_mode")
             .then((value) => (fs = value))
@@ -69,15 +68,17 @@
         });
 
         const appWindow = getCurrentWindow();
-        const unlistenFocus = appWindow.onFocusChanged(({ payload: focused }) => {
-            if (!focused && !locked) {
-                if (open) {
-                    toggle();
-                } else if (peek) {
-                    peek = false;
+        const unlistenFocus = appWindow.onFocusChanged(
+            ({ payload: focused }) => {
+                if (!focused && !locked) {
+                    if (open) {
+                        toggle();
+                    } else if (peek) {
+                        peek = false;
+                    }
                 }
-            }
-        });
+            },
+        );
 
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();
 
@@ -156,7 +157,10 @@
         wheelLocked = true;
         setTimeout(() => (wheelLocked = false), 350);
 
-        activeTab = Math.max(0, Math.min(TABS.length - 1, activeTab + Math.sign(delta)));
+        activeTab = Math.max(
+            0,
+            Math.min(TABS.length - 1, activeTab + Math.sign(delta)),
+        );
     }
 
     async function toggle() {
@@ -267,7 +271,10 @@
                             >
                                 <svelte:component
                                     this={tab.icon}
-                                    class="icon transition-all duration-300 ease-out {activeTab === index ? 'text-accent scale-110' : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
+                                    class="icon transition-all duration-300 ease-out {activeTab ===
+                                    index
+                                        ? 'text-accent scale-110'
+                                        : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
                                 />
                             </button>
                         {/each}
@@ -287,7 +294,10 @@
                             >
                                 <svelte:component
                                     this={tab.icon}
-                                    class="icon transition-all duration-300 ease-out {activeTab === index ? 'text-accent scale-110' : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
+                                    class="icon transition-all duration-300 ease-out {activeTab ===
+                                    index
+                                        ? 'text-accent scale-110'
+                                        : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
                                 />
                             </button>
                         {/each}
@@ -304,7 +314,10 @@
                         >
                             <svelte:component
                                 this={tab.icon}
-                                class="icon transition-all duration-300 ease-out {activeTab === index ? 'text-accent scale-110' : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
+                                class="icon transition-all duration-300 ease-out {activeTab ===
+                                index
+                                    ? 'text-accent scale-110'
+                                    : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
                             />
                         </button>
                     {/each}
@@ -325,10 +338,7 @@
                 >
                     <div class="panel">
                         <div class="panel-box">
-                            <div
-                                class="flex flex-col items-center"
-                                use:magnetic
-                            >
+                            <div class="flex flex-col items-center">
                                 <span class="title">{timeString}</span>
                                 <span class="subtitle">{dateString}</span>
                             </div>

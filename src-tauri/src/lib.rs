@@ -200,13 +200,14 @@ fn raise_if_allowed(hwnd_ptr: isize) {
 // background loop managing z-order, dock-fighting, mouse-hover peek logic and outside click detection
 #[cfg(target_os = "windows")]
 fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
-    const TICK_IDLE: Duration = Duration::from_millis(80);
-    const TICK_OPEN: Duration = Duration::from_millis(16); // fast polling so short clicks are caught
+    const TICK_IDLE: Duration = Duration::from_millis(120);
+    const TICK_OPEN: Duration = Duration::from_millis(24); // fast polling so short clicks are caught
     const RECHECK_STATE: Duration = Duration::from_millis(500);
     const RERAISE: Duration = Duration::from_millis(500);
     const HOLD: Duration = Duration::from_millis(300); // hover required before peek triggers
     const LEAVE: Duration = Duration::from_millis(400); // grace period before hiding peek
     const HIDE_DELAY: Duration = Duration::from_millis(500); // allow exit animation to finish before window moves
+    const SUSPEND_DELAY: Duration = Duration::from_millis(1000); // let the stow animation finish, then suspend
 
     let mut state = notification_state();
     let mut applied_state = -1;
@@ -217,6 +218,8 @@ fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
     let mut away_since: Option<Instant> = None;
     let mut hide_at: Option<Instant> = None;
     let mut was_down = false;
+    let mut quiet_since: Option<Instant> = None;
+    let mut suspended = false;
 
     loop {
         if last_state_check.elapsed() >= RECHECK_STATE {
@@ -239,6 +242,7 @@ fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
             hover_since = None;
             away_since = None;
             hide_at = None;
+            quiet_since = None;
 
             match state {
                 STATE_BUSY => {}
@@ -303,6 +307,31 @@ fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
                     force_topmost(hwnd_ptr);
                     last_raise = Instant::now();
                 }
+            }
+        }
+
+        // invisible while stowed in fullscreen, or exclusive fullscreen
+        let open_now = OPEN.load(Ordering::Relaxed);
+        let peek_now = PEEK.load(Ordering::Relaxed);
+        let hidden = match state {
+            STATE_D3D_FULLSCREEN | STATE_PRESENTATION => true,
+            STATE_BUSY => !open_now && !peek_now && !raised && hover_since.is_none(),
+            _ => false,
+        };
+
+        if hidden {
+            let since = *quiet_since.get_or_insert_with(Instant::now);
+            if !suspended && since.elapsed() >= SUSPEND_DELAY {
+                set_webview_suspended(&app, true);
+                suspended = true;
+                log::info!("webview suspended");
+            }
+        } else {
+            quiet_since = None;
+            if suspended {
+                set_webview_suspended(&app, false);
+                suspended = false;
+                log::info!("webview resumed");
             }
         }
 
@@ -375,63 +404,111 @@ fn fullscreen_mode() -> bool {
     FS_MODE.load(Ordering::Relaxed)
 }
 
-// restrict RAM to low target
 #[cfg(target_os = "windows")]
-fn lower_webview_memory(window: &tauri::WebviewWindow) {
+fn configure_webview(window: &tauri::WebviewWindow) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL, ICoreWebView2_19,
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL, ICoreWebView2Profile6, ICoreWebView2Settings3,
+        ICoreWebView2Settings5, ICoreWebView2Settings6, ICoreWebView2Settings8, ICoreWebView2_13,
+        ICoreWebView2_19,
     };
     use windows::core::Interface;
 
-    let target = COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL(1);
-
-    let _ = window.with_webview(move |webview| {
-        let result = unsafe {
-            webview
-                .controller()
-                .CoreWebView2()
-                .and_then(|core| core.cast::<ICoreWebView2_19>())
-                .and_then(|memory| memory.SetMemoryUsageTargetLevel(target))
+    let _ = window.with_webview(|webview| {
+        let core = match unsafe { webview.controller().CoreWebView2() } {
+            Ok(core) => core,
+            Err(error) => {
+                log::warn!("webview2 core unavailable: {error}");
+                return;
+            }
         };
 
-        if let Err(error) = result {
-            log::warn!("webview2 memory usage target unavailable: {error}");
+        unsafe {
+            if let Ok(settings) = core.Settings() {
+                // keep devtools usable while developing, closed in release
+                let _ = settings.SetAreDevToolsEnabled(cfg!(debug_assertions));
+                let _ = settings.SetAreDefaultContextMenusEnabled(false);
+                let _ = settings.SetAreDefaultScriptDialogsEnabled(false);
+                let _ = settings.SetIsStatusBarEnabled(false);
+                let _ = settings.SetIsZoomControlEnabled(false);
+
+                // accelerator keys: Ctrl+P print, Ctrl+F find, F5 reload, ...
+                if let Ok(settings3) = settings.cast::<ICoreWebView2Settings3>() {
+                    let _ = settings3.SetAreBrowserAcceleratorKeysEnabled(false);
+                }
+                if let Ok(settings5) = settings.cast::<ICoreWebView2Settings5>() {
+                    let _ = settings5.SetIsPinchZoomEnabled(false);
+                }
+                if let Ok(settings6) = settings.cast::<ICoreWebView2Settings6>() {
+                    let _ = settings6.SetIsSwipeNavigationEnabled(false);
+                }
+                if let Ok(settings8) = settings.cast::<ICoreWebView2Settings8>() {
+                    let _ = settings8.SetIsReputationCheckingRequired(false);
+                }
+            }
+
+            // disable autofill and password saving.
+            if let Ok(core13) = core.cast::<ICoreWebView2_13>() {
+                if let Ok(profile) = core13.Profile() {
+                    if let Ok(profile6) = profile.cast::<ICoreWebView2Profile6>() {
+                        let _ = profile6.SetIsGeneralAutofillEnabled(false);
+                        let _ = profile6.SetIsPasswordAutosaveEnabled(false);
+                    }
+                }
+            }
+
+            // keep the webview on the low-memory target from the start
+            match core.cast::<ICoreWebView2_19>() {
+                Ok(memory) => {
+                    let target = COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL(1);
+                    if let Err(error) = memory.SetMemoryUsageTargetLevel(target) {
+                        log::warn!("webview2 memory usage target unavailable: {error}");
+                    }
+                }
+                Err(error) => log::warn!("webview2 memory interface unavailable: {error}"),
+            }
         }
     });
 }
 
-// disable browser accelerator keys
+// suspend rendering while the island is stowed or hidden. resume before a peek is shown.
 #[cfg(target_os = "windows")]
-fn disable_browser_accelerators(window: &tauri::WebviewWindow) {
-    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+fn set_webview_suspended(app: &tauri::AppHandle, suspend: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_3;
+    use webview2_com::TrySuspendCompletedHandler;
     use windows::core::Interface;
 
-    let _ = window.with_webview(|webview| {
-        let result = unsafe {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+
+    let _ = window.with_webview(move |webview| {
+        let core = match unsafe {
             webview
                 .controller()
                 .CoreWebView2()
-                .and_then(|core| core.Settings())
-                .and_then(|settings| settings.cast::<ICoreWebView2Settings3>())
-                .and_then(|settings| settings.SetAreBrowserAcceleratorKeysEnabled(false))
+                .and_then(|core| core.cast::<ICoreWebView2_3>())
+        } {
+            Ok(core) => core,
+            Err(error) => {
+                log::warn!("webview2 suspend interface unavailable: {error}");
+                return;
+            }
         };
 
-        if let Err(error) = result {
-            log::warn!("webview2 browser accelerator keys unavailable: {error}");
+        if suspend {
+            let handler = TrySuspendCompletedHandler::create(Box::new(|error, succeeded| {
+                if error.is_err() || !succeeded {
+                    log::warn!("webview2 suspend failed: {error:?}");
+                }
+                Ok(())
+            }));
+            if let Err(error) = unsafe { core.TrySuspend(&handler) } {
+                log::warn!("webview2 suspend unavailable: {error}");
+            }
+        } else if let Err(error) = unsafe { core.Resume() } {
+            log::warn!("webview2 resume failed: {error}");
         }
     });
-}
-
-// IPC - trim webview memory
-#[tauri::command]
-fn low_memory(window: tauri::WebviewWindow) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    lower_webview_memory(&window);
-
-    #[cfg(not(target_os = "windows"))]
-    let _ = window;
-
-    Ok(())
 }
 
 // ---------- App init ----------
@@ -459,7 +536,7 @@ pub fn run() {
             center_top(&window)?;
 
             #[cfg(target_os = "windows")]
-            disable_browser_accelerators(&window);
+            configure_webview(&window);
 
             // Tray menu setup
             let autostart_item = CheckMenuItem::with_id(
@@ -522,8 +599,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             resize_island,
             set_open,
-            fullscreen_mode,
-            low_memory
+            fullscreen_mode
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");

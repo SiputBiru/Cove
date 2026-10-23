@@ -20,6 +20,13 @@ tauri-build = { version = "2.7.2", features = [] }
 [profile.dev]
 debug = "line-tables-only"
 
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "s"
+panic = "abort"
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
