@@ -13,14 +13,18 @@ use tauri::{
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::{HWND, POINT};
+use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON,
+};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::Shell::SHQueryUserNotificationState;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GWL_EXSTYLE, GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
-    SM_CXSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowLongPtrW, SetWindowPos,
-    WS_EX_NOACTIVATE,
+    GetWindowRect, SM_CXSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowLongPtrW,
+    SetWindowPos, WS_EX_NOACTIVATE,
 };
 
 // ---------- Shared state ----------
@@ -57,7 +61,7 @@ const TRIGGER_HALF_WIDTH: f64 = 110.0; // horizontal hotzone: 110px left/right f
 #[cfg(target_os = "windows")]
 const TRIGGER_HEIGHT: i32 = 2; // vertical hotzone: 2px from top edge to trigger
 #[cfg(target_os = "windows")]
-const KEEP_HALF_WIDTH: f64 = 130.0; // rxpanded keep-alive zone width while peeking
+const KEEP_HALF_WIDTH: f64 = 130.0; // expanded keep-alive zone width while peeking
 #[cfg(target_os = "windows")]
 const KEEP_HEIGHT: f64 = 28.0; // expanded keep-alive zone height while peeking
 
@@ -144,6 +148,34 @@ fn cursor_zones(scale: f64) -> (bool, bool) {
     }
 }
 
+// true while any mouse button is physically held down
+#[cfg(target_os = "windows")]
+fn mouse_down() -> bool {
+    unsafe {
+        [VK_LBUTTON, VK_RBUTTON, VK_MBUTTON]
+            .iter()
+            .any(|&vk| (GetAsyncKeyState(vk as i32) as u16 & 0x8000) != 0)
+    }
+}
+
+// true when the cursor is outside the island window's rectangle
+#[cfg(target_os = "windows")]
+fn cursor_outside_window(hwnd_ptr: isize) -> bool {
+    unsafe {
+        let mut pt = POINT { x: 0, y: 0 };
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        if GetCursorPos(&mut pt) == 0 || GetWindowRect(hwnd_ptr as HWND, &mut rect) == 0 {
+            return false;
+        }
+        pt.x < rect.left || pt.x >= rect.right || pt.y < rect.top || pt.y >= rect.bottom
+    }
+}
+
 // update local peek state and send frontend event when state changes
 #[cfg(target_os = "windows")]
 fn set_peek(app: &tauri::AppHandle, peek: bool) {
@@ -165,10 +197,11 @@ fn raise_if_allowed(hwnd_ptr: isize) {
     }
 }
 
-// background loop managing z-order, dock-fighting, and mouse-hover peek logic
+// background loop managing z-order, dock-fighting, mouse-hover peek logic and outside click detection
 #[cfg(target_os = "windows")]
 fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
-    const TICK: Duration = Duration::from_millis(80);
+    const TICK_IDLE: Duration = Duration::from_millis(80);
+    const TICK_OPEN: Duration = Duration::from_millis(16); // fast polling so short clicks are caught
     const RECHECK_STATE: Duration = Duration::from_millis(500);
     const RERAISE: Duration = Duration::from_millis(500);
     const HOLD: Duration = Duration::from_millis(300); // hover required before peek triggers
@@ -183,6 +216,7 @@ fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
     let mut hover_since: Option<Instant> = None;
     let mut away_since: Option<Instant> = None;
     let mut hide_at: Option<Instant> = None;
+    let mut was_down = false;
 
     loop {
         if last_state_check.elapsed() >= RECHECK_STATE {
@@ -193,7 +227,6 @@ fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
         // react when Windows changes fullscreen
         if state != applied_state {
             applied_state = state;
-            log::info!("notification state: {state}");
 
             let fs = state == STATE_BUSY;
             if fs != FS_MODE.load(Ordering::Relaxed) {
@@ -273,7 +306,15 @@ fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
             }
         }
 
-        thread::sleep(TICK);
+        // click outside detection, independent of window focus
+        let is_open = OPEN.load(Ordering::Relaxed);
+        let down = is_open && mouse_down();
+        if down && !was_down && cursor_outside_window(hwnd_ptr) {
+            let _ = app.emit("outside_click", ());
+        }
+        was_down = down;
+
+        thread::sleep(if is_open { TICK_OPEN } else { TICK_IDLE });
     }
 }
 
@@ -359,6 +400,28 @@ fn lower_webview_memory(window: &tauri::WebviewWindow) {
     });
 }
 
+// disable browser accelerator keys
+#[cfg(target_os = "windows")]
+fn disable_browser_accelerators(window: &tauri::WebviewWindow) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+    use windows::core::Interface;
+
+    let _ = window.with_webview(|webview| {
+        let result = unsafe {
+            webview
+                .controller()
+                .CoreWebView2()
+                .and_then(|core| core.Settings())
+                .and_then(|settings| settings.cast::<ICoreWebView2Settings3>())
+                .and_then(|settings| settings.SetAreBrowserAcceleratorKeysEnabled(false))
+        };
+
+        if let Err(error) = result {
+            log::warn!("webview2 browser accelerator keys unavailable: {error}");
+        }
+    });
+}
+
 // IPC - trim webview memory
 #[tauri::command]
 fn low_memory(window: tauri::WebviewWindow) -> Result<(), String> {
@@ -394,6 +457,9 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             raise_above_menu_bar(&window);
             center_top(&window)?;
+
+            #[cfg(target_os = "windows")]
+            disable_browser_accelerators(&window);
 
             // Tray menu setup
             let autostart_item = CheckMenuItem::with_id(

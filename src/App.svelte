@@ -8,14 +8,22 @@
 
     import { invoke } from "@tauri-apps/api/core";
     import { listen } from "@tauri-apps/api/event";
+    import { getCurrentWindow } from "@tauri-apps/api/window";
 
     import { onMount } from "svelte";
+    import { Clock, CheckSquare, Timer, FolderArchive } from "lucide-svelte";
 
     const SIZE = {
         compact: { width: 480, height: 32 },
         open: { width: 480, height: 205 },
     };
-    const TABS = ["Clock", "Todo", "Pomodoro", "Shelf"];
+
+    const TABS = [
+        { label: "Clock", icon: Clock },
+        { label: "Todo", icon: CheckSquare },
+        { label: "Pomodoro", icon: Timer },
+        { label: "Shelf", icon: FolderArchive },
+    ];
 
     let open = false;
     let wide = false;
@@ -56,7 +64,34 @@
             .then((value) => (fs = value))
             .catch(() => {});
 
+        const unlistenOutside = listen("outside_click", () => {
+            if (open && !locked) toggle();
+        });
+
+        const appWindow = getCurrentWindow();
+        const unlistenFocus = appWindow.onFocusChanged(({ payload: focused }) => {
+            if (!focused && !locked) {
+                if (open) {
+                    toggle();
+                } else if (peek) {
+                    peek = false;
+                }
+            }
+        });
+
         const handleContextMenu = (e: MouseEvent) => e.preventDefault();
+
+        const blockKeys = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            if (e.key !== "Tab") return;
+            const el = e.target as HTMLElement;
+            if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") return;
+            e.preventDefault();
+        };
 
         const onVisibility = () => {
             clearTimeout(clockTimer);
@@ -69,13 +104,17 @@
         if (isTauri) {
             window.addEventListener("contextmenu", handleContextMenu);
         }
+        window.addEventListener("keydown", blockKeys, true);
         document.addEventListener("visibilitychange", onVisibility);
         return () => {
             clearTimeout(clockTimer);
             unlistenFs.then((stop) => stop());
             unlistenPeek.then((stop) => stop());
+            unlistenOutside.then((stop) => stop());
+            unlistenFocus.then((stop) => stop());
             document.removeEventListener("visibilitychange", onVisibility);
             window.removeEventListener("contextmenu", handleContextMenu);
+            window.removeEventListener("keydown", blockKeys, true);
         };
     });
 
@@ -106,7 +145,6 @@
         hoverTimer = setTimeout(() => (wide = false), 350);
     }
 
-    // scroll panels
     let wheelLocked = false;
 
     function scrollNav(event: WheelEvent) {
@@ -159,6 +197,7 @@
 </script>
 
 <main class="flex justify-center">
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
         role="button"
         tabindex="0"
@@ -219,12 +258,17 @@
                         {#each TABS.slice(0, 2) as tab, index}
                             <button
                                 type="button"
-                                class="nav-pill"
+                                tabindex="-1"
+                                class="nav-pill group relative flex items-center justify-center"
                                 class:active={activeTab === index}
                                 on:click|stopPropagation={() =>
                                     (activeTab = index)}
+                                title={tab.label}
                             >
-                                {tab}
+                                <svelte:component
+                                    this={tab.icon}
+                                    class="icon transition-all duration-300 ease-out {activeTab === index ? 'text-accent scale-110' : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
+                                />
                             </button>
                         {/each}
                     </div>
@@ -234,12 +278,17 @@
                             {@const index = i + 2}
                             <button
                                 type="button"
-                                class="nav-pill"
+                                tabindex="-1"
+                                class="nav-pill group relative flex items-center justify-center"
                                 class:active={activeTab === index}
                                 on:click|stopPropagation={() =>
                                     (activeTab = index)}
+                                title={tab.label}
                             >
-                                {tab}
+                                <svelte:component
+                                    this={tab.icon}
+                                    class="icon transition-all duration-300 ease-out {activeTab === index ? 'text-accent scale-110' : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
+                                />
                             </button>
                         {/each}
                     </div>
@@ -247,11 +296,16 @@
                     {#each TABS as tab, index}
                         <button
                             type="button"
-                            class="nav-pill"
+                            tabindex="-1"
+                            class="nav-pill group relative flex items-center justify-center"
                             class:active={activeTab === index}
                             on:click|stopPropagation={() => (activeTab = index)}
+                            title={tab.label}
                         >
-                            {tab}
+                            <svelte:component
+                                this={tab.icon}
+                                class="icon transition-all duration-300 ease-out {activeTab === index ? 'text-accent scale-110' : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
+                            />
                         </button>
                     {/each}
                 {/if}
