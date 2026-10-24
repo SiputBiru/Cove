@@ -1,6 +1,6 @@
 [package]
 name = "Cove"
-version = "0.5.0"
+version = "0.6.0"
 description = "Time, held. A calm Dynamic Island-style overlay for your desktop."
 authors = ["Nobbel"]
 license = "MIT"
