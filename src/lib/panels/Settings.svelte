@@ -79,7 +79,7 @@
                         >time, held</span
                     >
                     <span class="text-[12px] text-white/50"
-                        >Version 0.5.7 beta</span
+                        >Version 0.6 beta</span
                     >
                 </div>
             {/if}
