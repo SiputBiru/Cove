@@ -2,19 +2,30 @@
     import "./app.css";
     import "./macos.css";
     import { platform } from "./lib/platform";
-    import { remaining } from "./lib/todos";
-    import Todo from "./lib/Todo.svelte";
+    import { remaining } from "./lib/panels/todos";
+
+    import ClockPanel from "./lib/panels/Clock.svelte";
+    import TodoPanel from "./lib/panels/Todo.svelte";
+    import PomodoroPanel from "./lib/panels/Pomodoro.svelte";
+    import ShelfPanel from "./lib/panels/Shelf.svelte";
+    import SettingsPanel from "./lib/panels/Settings.svelte";
 
     import { invoke } from "@tauri-apps/api/core";
     import { listen } from "@tauri-apps/api/event";
     import { getCurrentWindow } from "@tauri-apps/api/window";
 
     import { onMount } from "svelte";
-    import { Clock, CheckSquare, Timer, FolderArchive } from "lucide-svelte";
+    import {
+        Clock,
+        CheckSquare,
+        Timer,
+        FolderArchive,
+        Settings,
+    } from "lucide-svelte";
 
     const SIZE = {
         compact: { width: 480, height: 32 },
-        open: { width: 480, height: 205 },
+        open: { width: 480, height: 215 },
     };
 
     const TABS = [
@@ -22,6 +33,7 @@
         { label: "Todo", icon: CheckSquare },
         { label: "Pomodoro", icon: Timer },
         { label: "Shelf", icon: FolderArchive },
+        { label: "Settings", icon: Settings },
     ];
 
     let open = false;
@@ -30,15 +42,22 @@
     let activeTab = 0;
     let time = new Date();
 
-    let fs = false;
+    let launchAtLogin = true;
+    let use24HourClock = true;
+    let alwaysTiny = false;
 
+    let fs = false;
     let peek = false;
-    $: tiny = fs && !open;
+
+    $: tiny = (fs || alwaysTiny) && !open;
     $: stowed = fs && !open && !peek;
     $: if (fs) wide = false;
-    $: if (!fs) peek = false;
+    $: if (!fs && !alwaysTiny) peek = false;
 
-    const COOLDOWN_MS = 400;
+    let wasTiny = false;
+
+    const COOLDOWN_STANDARD = 400;
+    const COOLDOWN_TINY = 550;
     let locked = false;
 
     let clockTimer: ReturnType<typeof setTimeout> | undefined;
@@ -122,6 +141,7 @@
     $: timeString = time.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
+        hour12: !use24HourClock,
     });
     $: dayString = time.toLocaleDateString([], {
         weekday: "short",
@@ -136,7 +156,7 @@
     let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 
     function onEnter() {
-        if (tiny) return;
+        if (tiny || alwaysTiny) return;
         clearTimeout(hoverTimer);
         hoverTimer = setTimeout(() => (wide = true), 150);
     }
@@ -167,6 +187,15 @@
         if (locked) return;
         locked = true;
 
+        const startingFromTiny = tiny;
+        if (startingFromTiny) {
+            wasTiny = true;
+        }
+
+        const currentCooldown = startingFromTiny
+            ? COOLDOWN_TINY
+            : COOLDOWN_STANDARD;
+
         try {
             if (open) {
                 open = false;
@@ -179,7 +208,10 @@
             open = true;
             windowTall = true;
         } finally {
-            setTimeout(() => (locked = false), COOLDOWN_MS);
+            setTimeout(() => {
+                locked = false;
+                wasTiny = false;
+            }, currentCooldown);
         }
     }
 
@@ -209,6 +241,7 @@
         class:wide
         class:open
         class:tiny
+        class:was-tiny={wasTiny}
         class:stowed
         on:click={toggle}
         on:keydown={buttonLike}
@@ -230,9 +263,9 @@
                 {#if platform === "macos"}
                     <!-- render nothing -->
                 {:else}
-                    <span class="compact-wide"
-                        ><span class="text-accent font-bold">{dayString}</span>, {dateString}</span
-                    >
+                    <span class="compact-wide">
+                        <span class="text-accent font-bold">{dayString}</span>, {dateString}
+                    </span>
                 {/if}
                 <span>{timeString}</span>
                 <span class="compact-wide right">
@@ -251,59 +284,13 @@
 
             <!-- Tab nav -->
             <div
-                class="reveal top-nav w-full flex {platform === 'macos'
-                    ? 'justify-between'
-                    : 'justify-center'} items-center"
+                class="reveal top-nav w-full flex justify-between items-center px-3"
                 class:shown={open}
                 on:wheel|preventDefault={scrollNav}
             >
-                {#if platform === "macos"}
-                    <div class="flex items-center gap-1">
-                        {#each TABS.slice(0, 2) as tab, index}
-                            <button
-                                type="button"
-                                tabindex="-1"
-                                class="nav-pill group relative flex items-center justify-center"
-                                class:active={activeTab === index}
-                                on:click|stopPropagation={() =>
-                                    (activeTab = index)}
-                                title={tab.label}
-                            >
-                                <svelte:component
-                                    this={tab.icon}
-                                    class="icon transition-all duration-300 ease-out {activeTab ===
-                                    index
-                                        ? 'text-accent scale-110'
-                                        : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
-                                />
-                            </button>
-                        {/each}
-                    </div>
-
-                    <div class="flex items-center gap-1">
-                        {#each TABS.slice(2) as tab, i}
-                            {@const index = i + 2}
-                            <button
-                                type="button"
-                                tabindex="-1"
-                                class="nav-pill group relative flex items-center justify-center"
-                                class:active={activeTab === index}
-                                on:click|stopPropagation={() =>
-                                    (activeTab = index)}
-                                title={tab.label}
-                            >
-                                <svelte:component
-                                    this={tab.icon}
-                                    class="icon transition-all duration-300 ease-out {activeTab ===
-                                    index
-                                        ? 'text-accent scale-110'
-                                        : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
-                                />
-                            </button>
-                        {/each}
-                    </div>
-                {:else}
-                    {#each TABS as tab, index}
+                <!-- Left Nav Group -->
+                <div class="flex items-center gap-1.5">
+                    {#each TABS.slice(0, 4) as tab, index}
                         <button
                             type="button"
                             tabindex="-1"
@@ -321,6 +308,28 @@
                             />
                         </button>
                     {/each}
+                </div>
+
+                <!-- Right Nav Group (Settings) -->
+                {#if TABS[4]}
+                    {@const settingsIndex = 4}
+                    <button
+                        type="button"
+                        tabindex="-1"
+                        class="nav-pill group relative flex items-center justify-center"
+                        class:active={activeTab === settingsIndex}
+                        on:click|stopPropagation={() =>
+                            (activeTab = settingsIndex)}
+                        title={TABS[settingsIndex].label}
+                    >
+                        <svelte:component
+                            this={TABS[settingsIndex].icon}
+                            class="icon transition-all duration-300 ease-out {activeTab ===
+                            settingsIndex
+                                ? 'text-accent scale-110'
+                                : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
+                        />
+                    </button>
                 {/if}
             </div>
 
@@ -336,42 +345,23 @@
                     class="slider-track"
                     style="transform: translateX(-{activeTab * 100}%);"
                 >
-                    <div class="panel">
-                        <div class="panel-box">
-                            <div class="flex flex-col items-center">
-                                <span class="title">{timeString}</span>
-                                <span class="subtitle">{dateString}</span>
-                            </div>
-                        </div>
-                    </div>
+                    <ClockPanel {timeString} {dateString} />
 
                     <div class="panel">
                         <div class="panel-box">
-                            <Todo />
+                            <TodoPanel />
                         </div>
                     </div>
 
-                    <div class="panel">
-                        <div class="panel-box">
-                            <span class="text-[24px]"
-                                >Pomodoro (unfinished)</span
-                            >
-                            <span class="start-pill">Start</span>
-                        </div>
-                    </div>
+                    <PomodoroPanel />
 
-                    <div class="panel">
-                        <div class="panel-box justify-start!">
-                            <div
-                                class="flex justify-center items-center border-2 border-white/35 border-dashed w-full h-full m-2 rounded-2xl"
-                            >
-                                <span
-                                    class="text-[13px] font-light text-white/50 mt-0.5"
-                                    >Temporarily saved files (unfinished)</span
-                                >
-                            </div>
-                        </div>
-                    </div>
+                    <ShelfPanel />
+
+                    <SettingsPanel
+                        bind:use24HourClock
+                        bind:alwaysTiny
+                        bind:launchAtLogin
+                    />
                 </div>
             </div>
         </div>
