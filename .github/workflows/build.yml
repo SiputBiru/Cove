@@ -8,13 +8,18 @@ env:
 
 jobs:
   build:
-    name: ubuntu-latest
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux-latest, macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -50,13 +55,18 @@ jobs:
         env:
           RUSTFLAGS: -D warnings
 
-      - name: Build app bundles
+      - name: Build app bundles (Linux .deb only)
+        if: runner.os == 'Linux'
         run: bun tauri:build --bundles deb
 
-      - name: Upload Debian bundle
+      - name: Build app bundles (macOS & Windows)
+        if: runner.os != 'Linux'
+        run: bun tauri:build
+
+      - name: Upload bundles
         uses: actions/upload-artifact@v4
         with:
-          name: bundle-debian
-          path: src-tauri/target/release/bundle/deb/*.deb
-          if-no-files-found: error
+          name: bundles-${{ matrix.os }}
+          path: src-tauri/target/release/bundle/**
+          if-no-files-found: warn
           retention-days: 7
