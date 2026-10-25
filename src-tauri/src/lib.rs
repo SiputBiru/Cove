@@ -15,6 +15,8 @@ use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::{HWND, POINT, RECT};
 #[cfg(target_os = "windows")]
+use windows_sys::Win32::Graphics::Dwm::{DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute};
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON,
 };
@@ -22,20 +24,23 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 use windows_sys::Win32::UI::Shell::SHQueryUserNotificationState;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GWL_EXSTYLE, GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowLongPtrW,
-    GetWindowRect, SM_CXSCREEN, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetWindowLongPtrW,
-    SetWindowPos, WS_EX_NOACTIVATE,
+    GWL_EXSTYLE, GetClassNameW, GetCursorPos, GetForegroundWindow, GetSystemMetrics,
+    GetWindowLongPtrW, GetWindowRect, IsIconic, IsZoomed, SM_CXSCREEN, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SetWindowLongPtrW, SetWindowPos, WS_EX_NOACTIVATE,
 };
 
 // ---------- Shared state ----------
 
 // true while the island is expanded (by frontend)
 static OPEN: AtomicBool = AtomicBool::new(false);
-// true while a fullscreen app that supports the peek is running
+// true while a fullscreen app (or snapped split screen) that supports the peek is running
 static FS_MODE: AtomicBool = AtomicBool::new(false);
 // true while the tiny island is showing above a fullscreen app
 #[cfg(target_os = "windows")]
 static PEEK: AtomicBool = AtomicBool::new(false);
+// true while a snapped window sits against the island (split screen)
+#[cfg(target_os = "windows")]
+static SNAPPED: AtomicBool = AtomicBool::new(false);
 
 // ---------- Windows: z-order + fullscreen peek ----------
 
@@ -64,6 +69,12 @@ const TRIGGER_HEIGHT: i32 = 2; // vertical hotzone: 2px from top edge to trigger
 const KEEP_HALF_WIDTH: f64 = 130.0; // expanded keep-alive zone width while peeking
 #[cfg(target_os = "windows")]
 const KEEP_HEIGHT: f64 = 28.0; // expanded keep-alive zone height while peeking
+
+// Split screen detection (logical px, scaled by DPI at runtime)
+#[cfg(target_os = "windows")]
+const ISLAND_HALF_WIDTH: f64 = 90.0; // compact island is 180px wide
+#[cfg(target_os = "windows")]
+const SNAP_TOP_TOLERANCE: f64 = 12.0; // how close to the top edge a snapped window must be
 
 // force to stay above all normal apps without stealing focus
 #[cfg(target_os = "windows")]
@@ -124,12 +135,83 @@ fn set_no_activate(hwnd_ptr: isize, on: bool) {
     }
 }
 
-// Windows API commands for fullscreen state
+// raw Windows API fullscreen state
 #[cfg(target_os = "windows")]
 fn notification_state() -> i32 {
     let mut state: i32 = STATE_NORMAL;
     let hr = unsafe { SHQueryUserNotificationState(&mut state) };
     if hr >= 0 { state } else { STATE_NORMAL }
+}
+
+// A snapped split is reported as STATE_BUSY so it gets the same stow / peek behavior.
+#[cfg(target_os = "windows")]
+fn effective_state() -> i32 {
+    let state = notification_state();
+    if state == STATE_NORMAL && SNAPPED.load(Ordering::Relaxed) {
+        STATE_BUSY
+    } else {
+        state
+    }
+}
+
+// Is the foreground window snapped against the island?
+#[cfg(target_os = "windows")]
+fn split_screen_active(own_hwnd: isize, scale: f64) -> Option<bool> {
+    unsafe {
+        let fg = GetForegroundWindow();
+        if fg.is_null() {
+            return Some(false);
+        }
+        if fg as isize == own_hwnd {
+            return None;
+        }
+        if IsIconic(fg) != 0 || IsZoomed(fg) != 0 {
+            return Some(false);
+        }
+
+        // ignore desktop / taskbar / shell surfaces
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(fg, buf.as_mut_ptr(), buf.len() as i32);
+        let class = String::from_utf16_lossy(&buf[..n.max(0) as usize]);
+        if matches!(
+            class.as_str(),
+            "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd"
+        ) {
+            return Some(false);
+        }
+
+        // visible frame
+        let mut r = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        let hr = DwmGetWindowAttribute(
+            fg,
+            DWMWA_EXTENDED_FRAME_BOUNDS as u32,
+            &mut r as *mut RECT as *mut _,
+            std::mem::size_of::<RECT>() as u32,
+        );
+        if hr != 0 && GetWindowRect(fg, &mut r) == 0 {
+            return Some(false);
+        }
+
+        let screen_w = GetSystemMetrics(SM_CXSCREEN);
+        if r.right - r.left >= screen_w - 2 {
+            return Some(false);
+        }
+
+        let center = screen_w / 2;
+        let tol_y = (SNAP_TOP_TOLERANCE * scale) as i32;
+        let reach = (ISLAND_HALF_WIDTH * scale) as i32;
+
+        let touches_top = r.top.abs() <= tol_y;
+        let edge_under_island =
+            (r.left - center).abs() <= reach || (r.right - center).abs() <= reach;
+
+        Some(touches_top && edge_under_island)
+    }
 }
 
 // check if cursor currently in the top-center hover activation zones
@@ -187,7 +269,7 @@ fn set_peek(app: &tauri::AppHandle, peek: bool) {
 // reraise window to topmost only if current screen state permits it
 #[cfg(target_os = "windows")]
 fn raise_if_allowed(hwnd_ptr: isize) {
-    let allowed = match notification_state() {
+    let allowed = match effective_state() {
         STATE_BUSY => OPEN.load(Ordering::Relaxed) || PEEK.load(Ordering::Relaxed),
         STATE_D3D_FULLSCREEN | STATE_PRESENTATION => false,
         _ => true,
@@ -202,14 +284,14 @@ fn raise_if_allowed(hwnd_ptr: isize) {
 fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
     const TICK_IDLE: Duration = Duration::from_millis(120);
     const TICK_OPEN: Duration = Duration::from_millis(24); // fast polling so short clicks are caught
-    const RECHECK_STATE: Duration = Duration::from_millis(500);
+    const RECHECK_STATE: Duration = Duration::from_millis(250);
     const RERAISE: Duration = Duration::from_millis(500);
     const HOLD: Duration = Duration::from_millis(300); // hover required before peek triggers
     const LEAVE: Duration = Duration::from_millis(400); // grace period before hiding peek
     const HIDE_DELAY: Duration = Duration::from_millis(500); // allow exit animation to finish before window moves
     const SUSPEND_DELAY: Duration = Duration::from_millis(1000); // let the stow animation finish, then suspend
 
-    let mut state = notification_state();
+    let mut state = effective_state();
     let mut applied_state = -1;
     let mut last_state_check = Instant::now();
     let mut last_raise = Instant::now();
@@ -223,7 +305,10 @@ fn z_order_loop(app: tauri::AppHandle, hwnd_ptr: isize, scale: f64) {
 
     loop {
         if last_state_check.elapsed() >= RECHECK_STATE {
-            state = notification_state();
+            if let Some(v) = split_screen_active(hwnd_ptr, scale) {
+                SNAPPED.store(v, Ordering::Relaxed);
+            }
+            state = effective_state();
             last_state_check = Instant::now();
         }
 
@@ -398,7 +483,7 @@ fn set_open(open: bool) {
     OPEN.store(open, Ordering::Relaxed);
 }
 
-// IPC - check if is in fullscreen
+// IPC - check if is in fullscreen (or split screen)
 #[tauri::command]
 fn fullscreen_mode() -> bool {
     FS_MODE.load(Ordering::Relaxed)
@@ -407,9 +492,10 @@ fn fullscreen_mode() -> bool {
 #[cfg(target_os = "windows")]
 fn configure_webview(window: &tauri::WebviewWindow) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL, ICoreWebView2Profile6, ICoreWebView2Settings3,
-        ICoreWebView2Settings5, ICoreWebView2Settings6, ICoreWebView2Settings8, ICoreWebView2_13,
-        ICoreWebView2_19,
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL, COREWEBVIEW2_TRACKING_PREVENTION_LEVEL,
+        ICoreWebView2_13, ICoreWebView2_19, ICoreWebView2Profile3, ICoreWebView2Profile6,
+        ICoreWebView2Settings3, ICoreWebView2Settings5, ICoreWebView2Settings6,
+        ICoreWebView2Settings8,
     };
     use windows::core::Interface;
 
@@ -430,6 +516,8 @@ fn configure_webview(window: &tauri::WebviewWindow) {
                 let _ = settings.SetAreDefaultScriptDialogsEnabled(false);
                 let _ = settings.SetIsStatusBarEnabled(false);
                 let _ = settings.SetIsZoomControlEnabled(false);
+                let _ = settings.SetIsBuiltInErrorPageEnabled(false);
+                let _ = settings.SetAreHostObjectsAllowed(false);
 
                 // accelerator keys: Ctrl+P print, Ctrl+F find, F5 reload, ...
                 if let Ok(settings3) = settings.cast::<ICoreWebView2Settings3>() {
@@ -452,6 +540,11 @@ fn configure_webview(window: &tauri::WebviewWindow) {
                     if let Ok(profile6) = profile.cast::<ICoreWebView2Profile6>() {
                         let _ = profile6.SetIsGeneralAutofillEnabled(false);
                         let _ = profile6.SetIsPasswordAutosaveEnabled(false);
+                    }
+                    if let Ok(profile3) = profile.cast::<ICoreWebView2Profile3>() {
+                        let _ = profile3.SetPreferredTrackingPreventionLevel(
+                            COREWEBVIEW2_TRACKING_PREVENTION_LEVEL(0), // none
+                        );
                     }
                 }
             }
@@ -530,6 +623,13 @@ pub fn run() {
             }
 
             let window = app.get_webview_window("main").unwrap();
+
+            #[cfg(debug_assertions)]
+            {
+                if std::env::var_os("COVE_DEVTOOLS").is_some() {
+                    window.open_devtools();
+                }
+            }
 
             #[cfg(target_os = "macos")]
             raise_above_menu_bar(&window);

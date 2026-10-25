@@ -77,15 +77,15 @@
                     <span class="text-[16px] font-semibold text-accent"
                         >Cove</span
                     >
-                    <span class="text-[12px] font-semibold text-white/75"
+                    <span class="text-[11px] font-semibold text-white/75"
                         >time, held</span
                     >
-                    <span class="text-[12px] text-white/50"
+                    <span class="text-[11px] text-white/50"
                         >Version 0.6.2 beta</span
                     >
 
                     <!-- Credits Section -->
-                    <div class="mt-2 text-[11px] text-white/60">
+                    <div class="mt-0.5 text-[9px] text-white/60">
                         Handcrafted by <span class="text-accent">nobberu</span>
                     </div>
                 </div>
