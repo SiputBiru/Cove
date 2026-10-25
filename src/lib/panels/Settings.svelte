@@ -1,11 +1,39 @@
 <script lang="ts">
     import { Monitor, Minimize2, ShieldCheck } from "lucide-svelte";
+    import { invoke } from "@tauri-apps/api/core";
+    import { onMount } from "svelte";
 
     export let use24HourClock: boolean;
     export let alwaysTiny: boolean;
     export let launchAtLogin: boolean;
 
     let settingsSubTab: "general" | "notifications" | "about" = "general";
+
+    const AUTOSTART_DEFAULTED_KEY = "cove:autostart-defaulted";
+
+    onMount(async () => {
+        try {
+            let enabled = await invoke<boolean>("is_autostart_enabled");
+            if (!enabled && !localStorage.getItem(AUTOSTART_DEFAULTED_KEY)) {
+                await invoke("set_autostart", { enabled: true });
+                enabled = true;
+            }
+            launchAtLogin = enabled;
+            localStorage.setItem(AUTOSTART_DEFAULTED_KEY, "true");
+        } catch {
+            // ignore
+        }
+    });
+
+    async function toggleAutostart() {
+        const next = !launchAtLogin;
+        try {
+            await invoke("set_autostart", { enabled: next });
+            launchAtLogin = next;
+        } catch {
+            launchAtLogin = !next;
+        }
+    }
 </script>
 
 <div class="panel">
@@ -66,7 +94,8 @@
                     </div>
                     <input
                         type="checkbox"
-                        bind:checked={launchAtLogin}
+                        checked={launchAtLogin}
+                        on:change={toggleAutostart}
                         class="toggle-checkbox"
                     />
                 </label>

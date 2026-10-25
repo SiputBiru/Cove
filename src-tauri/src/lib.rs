@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use tauri::Emitter;
 use tauri::{
     Manager,
-    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
+    menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
@@ -489,6 +489,21 @@ fn fullscreen_mode() -> bool {
     FS_MODE.load(Ordering::Relaxed)
 }
 
+#[tauri::command]
+fn is_autostart_enabled(app: tauri::AppHandle) -> bool {
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+#[tauri::command]
+fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let manager = app.autolaunch();
+    if enabled {
+        manager.enable().map_err(|e| e.to_string())
+    } else {
+        manager.disable().map_err(|e| e.to_string())
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn configure_webview(window: &tauri::WebviewWindow) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
@@ -639,19 +654,8 @@ pub fn run() {
             configure_webview(&window);
 
             // Tray menu setup
-            let autostart_item = CheckMenuItem::with_id(
-                app,
-                "autostart",
-                "Start at login",
-                true,
-                app.autolaunch().is_enabled().unwrap_or(false),
-                None::<&str>,
-            )?;
-            let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Cove", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&autostart_item, &separator, &quit])?;
-
-            let autostart_handle = autostart_item.clone();
+            let menu = Menu::with_items(app, &[&quit])?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -659,18 +663,6 @@ pub fn run() {
                 .menu(&menu)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "quit" => app.exit(0),
-                    "autostart" => {
-                        let manager = app.autolaunch();
-                        let result = if manager.is_enabled().unwrap_or(false) {
-                            manager.disable()
-                        } else {
-                            manager.enable()
-                        };
-                        if let Err(error) = result {
-                            log::warn!("autostart toggle failed: {error}");
-                        }
-                        let _ = autostart_handle.set_checked(manager.is_enabled().unwrap_or(false));
-                    }
                     _ => {}
                 })
                 .build(app)?;
@@ -699,7 +691,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             resize_island,
             set_open,
-            fullscreen_mode
+            fullscreen_mode,
+            is_autostart_enabled,
+            set_autostart
         ])
         .run(tauri::generate_context!())
         .expect("error while building tauri application");
