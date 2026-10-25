@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cove",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "identifier": "com.nobberu.cove",
   "build": {
     "frontendDist": "../dist",
@@ -21,7 +21,7 @@
         "skipTaskbar": true,
         "resizable": false,
         "shadow": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-background-networking --disable-gpu --js-flags=\"--jitless\""
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,Translate,OptimizationHints,MediaRouter --disable-background-networking --disable-component-update --disable-breakpad --disable-domain-reliability --disable-client-side-phishing-detection --disable-default-apps --no-first-run --disable-gpu --js-flags=--jitless"
       }
     ],
     "security": {

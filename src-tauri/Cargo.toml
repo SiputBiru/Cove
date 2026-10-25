@@ -1,6 +1,6 @@
 [package]
 name = "Cove"
-version = "0.6.0"
+version = "0.6.2"
 description = "Time, held. A calm Dynamic Island-style overlay for your desktop."
 authors = ["Nobbel"]
 license = "MIT"
@@ -33,6 +33,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Shell",
     "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_Graphics_Dwm",
 ] }
 webview2-com = "0.39"
 windows = "0.62"

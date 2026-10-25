@@ -2,11 +2,10 @@
     import "./app.css";
     import "./macos.css";
     import { platform } from "./lib/platform";
-    import { remaining } from "./lib/panels/todos";
+    import { remaining } from "./lib/stores/todos";
 
     import ClockPanel from "./lib/panels/Clock.svelte";
     import TodoPanel from "./lib/panels/Todo.svelte";
-    import PomodoroPanel from "./lib/panels/Pomodoro.svelte";
     import ShelfPanel from "./lib/panels/Shelf.svelte";
     import SettingsPanel from "./lib/panels/Settings.svelte";
 
@@ -31,11 +30,13 @@
     const TABS = [
         { label: "Clock", icon: Clock },
         { label: "Todo", icon: CheckSquare },
-        { label: "Pomodoro", icon: Timer },
-        { label: "Shelf", icon: FolderArchive },
+        { label: "Pomodoro", icon: Timer, unfinished: true },
+        { label: "Shelf", icon: FolderArchive, unfinished: true },
         { label: "Settings", icon: Settings },
     ];
 
+    const SETTINGS_INDEX = TABS.length - 1;
+    
     let open = false;
     let wide = false;
     let windowTall = false;
@@ -267,7 +268,9 @@
                         <span class="text-accent font-bold">{dayString}</span>, {dateString}
                     </span>
                 {/if}
-                <span>{timeString}</span>
+                <div class="relative flex items-center gap-1.5">
+                    <span>{timeString}</span>
+                </div>
                 <span class="compact-wide right">
                     {#if $remaining === 0}
                         all clear
@@ -290,19 +293,17 @@
             >
                 <!-- Left Nav Group -->
                 <div class="flex items-center gap-1.5">
-                    {#each TABS.slice(0, 4) as tab, index}
+                    {#each TABS.slice(0, SETTINGS_INDEX) as tab, index}
                         <button
                             type="button"
                             tabindex="-1"
                             class="nav-pill group relative flex items-center justify-center"
                             class:active={activeTab === index}
                             on:click|stopPropagation={() => (activeTab = index)}
-                            title={tab.label}
                         >
                             <svelte:component
                                 this={tab.icon}
-                                class="icon transition-all duration-300 ease-out {activeTab ===
-                                index
+                                class="icon {tab.unfinished ? 'opacity-60' : ''} {activeTab === index
                                     ? 'text-accent scale-110'
                                     : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
                             />
@@ -311,8 +312,8 @@
                 </div>
 
                 <!-- Right Nav Group (Settings) -->
-                {#if TABS[4]}
-                    {@const settingsIndex = 4}
+                {#if TABS[SETTINGS_INDEX]}
+                    {@const settingsIndex = SETTINGS_INDEX}
                     <button
                         type="button"
                         tabindex="-1"
@@ -324,8 +325,7 @@
                     >
                         <svelte:component
                             this={TABS[settingsIndex].icon}
-                            class="icon transition-all duration-300 ease-out {activeTab ===
-                            settingsIndex
+                            class="icon {activeTab === settingsIndex
                                 ? 'text-accent scale-110'
                                 : 'text-white/70 group-hover:text-white group-hover:scale-110'}"
                         />
@@ -353,9 +353,18 @@
                         </div>
                     </div>
 
-                    <PomodoroPanel />
+                    <div class="panel">
+                        <div class="panel-box gap-1.5">
+                            <Timer class="size-6 text-accent/80" />
+                            <span class="text-sm font-semibold">Pomodoro</span>
+                            <span
+                                class="text-[11px] text-[#8e8e93]"
+                                >Unfinished · coming in v0.7</span
+                            >
+                        </div>
+                    </div>
 
-                    <ShelfPanel />
+                    <ShelfPanel/>>
 
                     <SettingsPanel
                         bind:use24HourClock

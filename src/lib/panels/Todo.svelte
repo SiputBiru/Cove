@@ -8,7 +8,7 @@
         toggleTask,
         removeTask,
         clearDone,
-    } from "./todos";
+    } from "../stores/todos";
 
     let draft = "";
 
