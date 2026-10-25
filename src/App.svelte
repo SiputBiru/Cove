@@ -364,7 +364,7 @@
                         </div>
                     </div>
 
-                    <ShelfPanel/>>
+                    <ShelfPanel/>
 
                     <SettingsPanel
                         bind:use24HourClock
